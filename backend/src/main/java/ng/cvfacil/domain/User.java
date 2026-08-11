@@ -1,0 +1,81 @@
+package ng.cvfacil.domain;
+
+import jakarta.persistence.*;
+import java.time.Instant;
+import java.util.UUID;
+import ng.cvfacil.domain.convert.MfaSecretConverter;
+
+@Entity
+@Table(name = "users")
+public class User {
+
+  public enum Role { USER, ROOT_MASTER }
+
+  @Id
+  @GeneratedValue(strategy = GenerationType.UUID)
+  private UUID id;
+
+  @Column(nullable = false, unique = true, columnDefinition = "citext")
+  private String email;
+
+  /** BCrypt hash — nullable para contas que usam apenas OAuth. */
+  @Column(name = "password_hash", length = 100)
+  private String passwordHash;
+
+  @Column(name = "display_name", length = 120)
+  private String displayName;
+
+  @Column(nullable = false, length = 10)
+  private String locale = "pt-BR";
+
+  @Enumerated(EnumType.STRING)
+  @Column(nullable = false, length = 32)
+  private Role role = Role.USER;
+
+  @Column(name = "email_verified", nullable = false)
+  private boolean emailVerified;
+
+  // Cifrado em repouso via MfaSecretConverter (AES-256-GCM) — ver V4 migration
+  // que amplia a coluna: base64(IV + tag + segredo) é maior que o texto puro.
+  @Convert(converter = MfaSecretConverter.class)
+  @Column(name = "mfa_secret", length = 255)
+  private String mfaSecret;
+
+  @Column(name = "failed_logins", nullable = false)
+  private int failedLogins;
+
+  @Column(name = "locked_until")
+  private Instant lockedUntil;
+
+  @Column(name = "created_at", nullable = false, updatable = false)
+  private Instant createdAt = Instant.now();
+
+  @Column(name = "updated_at", nullable = false)
+  private Instant updatedAt = Instant.now();
+
+  @PreUpdate
+  void onUpdate() { this.updatedAt = Instant.now(); }
+
+  // ---- Getters / Setters ----
+  public UUID getId() { return id; }
+  public String getEmail() { return email; }
+  public void setEmail(String email) { this.email = email; }
+  public String getPasswordHash() { return passwordHash; }
+  public void setPasswordHash(String passwordHash) { this.passwordHash = passwordHash; }
+  public String getDisplayName() { return displayName; }
+  public void setDisplayName(String n) { this.displayName = n; }
+  public String getLocale() { return locale; }
+  public void setLocale(String l) { this.locale = l; }
+  public Role getRole() { return role; }
+  public void setRole(Role r) { this.role = r; }
+  public boolean isEmailVerified() { return emailVerified; }
+  public void setEmailVerified(boolean v) { this.emailVerified = v; }
+  public String getMfaSecret() { return mfaSecret; }
+  public void setMfaSecret(String s) { this.mfaSecret = s; }
+  public int getFailedLogins() { return failedLogins; }
+  public void setFailedLogins(int n) { this.failedLogins = n; }
+  public Instant getLockedUntil() { return lockedUntil; }
+  public void setLockedUntil(Instant t) { this.lockedUntil = t; }
+  public Instant getCreatedAt() { return createdAt; }
+  public Instant getUpdatedAt() { return updatedAt; }
+}

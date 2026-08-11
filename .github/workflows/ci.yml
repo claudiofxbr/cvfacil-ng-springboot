@@ -1,0 +1,135 @@
+name: CI
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # ---------- FRONTEND ----------
+  frontend:
+    name: Frontend — Lint, Build, Test
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install (clean, reproducible)
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Test
+        run: npm test --if-present
+
+      - name: Build (standalone)
+        run: npm run build
+        env:
+          NEXT_PUBLIC_API_BASE_URL: http://localhost:8080
+
+      - name: Upload frontend artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-standalone
+          path: frontend/.next/standalone
+
+  # ---------- BACKEND ----------
+  backend:
+    name: Backend — Spotless, Test, Package
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: cvfacil_app
+          POSTGRES_PASSWORD: cvfacil_pwd
+          POSTGRES_DB: cvfacil
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd="pg_isready -U cvfacil_app"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=5
+      redis:
+        image: redis:7
+        ports: ['6379:6379']
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '21'
+          cache: 'maven'
+
+      - name: Spotless check
+        run: mvn -B spotless:check
+
+      - name: Test
+        run: mvn -B test
+        env:
+          DATABASE_URL: jdbc:postgresql://localhost:5432/cvfacil
+          DATABASE_USERNAME: cvfacil_app
+          DATABASE_PASSWORD: cvfacil_pwd
+          REDIS_URL: redis://localhost:6379
+
+      - name: Package (fat JAR)
+        run: mvn -B -DskipTests package
+
+      - name: Upload backend artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-jar
+          path: backend/target/*.jar
+
+  # ---------- SECURITY ----------
+  security:
+    name: Security — SAST + Dependency Check
+    runs-on: ubuntu-latest
+    permissions:
+      security-events: write
+      actions: read
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: CodeQL init
+        uses: github/codeql-action/init@v3
+        with:
+          languages: javascript,java
+
+      - name: CodeQL analyze
+        uses: github/codeql-action/analyze@v3
+
+      - name: Gitleaks
+        uses: gitleaks/gitleaks-action@v2
+        with:
+          config-path: .gitleaks.toml
+        continue-on-error: true
+
+      - name: Trivy (dependências do repositório)
+        uses: aquasecurity/trivy-action@0.24.0
+        with:
+          scan-type: fs
+          severity: HIGH,CRITICAL
+          exit-code: '1'
+          ignore-unfixed: true

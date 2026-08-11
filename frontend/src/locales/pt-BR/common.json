@@ -1,0 +1,68 @@
+{
+  "app": {
+    "name": "CVFacil.NG",
+    "tagline": "Crie currículos modernos em minutos"
+  },
+  "nav": {
+    "home": "Início",
+    "templates": "Modelos",
+    "dashboard": "Painel",
+    "login": "Entrar",
+    "logout": "Sair",
+    "profile": "Meu perfil",
+    "settings": "Configurações",
+    "language": "Idioma",
+    "myResumes": "Meus currículos"
+  },
+  "home": {
+    "heroTitle": "O currículo certo, no estilo que combina com você.",
+    "heroSubtitle": "9 modelos modernos, importação por IA e acabamento profissional. Tudo em português, inglês ou espanhol.",
+    "cta": "Começar agora",
+    "ctaSecondary": "Ver modelos"
+  },
+  "auth": {
+    "loginTitle": "Entrar no CVFacil.NG",
+    "emailLabel": "E-mail",
+    "passwordLabel": "Senha",
+    "submit": "Entrar",
+    "google": "Entrar com Google",
+    "orSeparator": "ou continue com e-mail",
+    "noAccount": "Não tem conta?",
+    "createAccount": "Criar conta",
+    "forgotPassword": "Esqueci minha senha"
+  },
+  "dashboard": {
+    "title": "Meu painel",
+    "tabs": {
+      "templates": "Modelos de Currículos",
+      "myResumes": "Meus Currículos",
+      "aiImport": "Importar com IA"
+    },
+    "filters": {
+      "palette": "Paleta",
+      "style": "Estilo",
+      "sort": "Ordenar por",
+      "search": "Buscar modelo..."
+    },
+    "actions": {
+      "useTemplate": "Usar este modelo",
+      "preview": "Pré-visualizar",
+      "favorite": "Favoritar"
+    }
+  },
+  "photo": {
+    "title": "Foto 3x4 com moldura",
+    "upload": "Enviar foto",
+    "frame": "Moldura",
+    "crop": "Recortar",
+    "rotate": "Girar",
+    "removeBg": "Remover fundo"
+  },
+  "common": {
+    "loading": "Carregando...",
+    "error": "Algo deu errado",
+    "save": "Salvar",
+    "cancel": "Cancelar",
+    "confirm": "Confirmar"
+  }
+}

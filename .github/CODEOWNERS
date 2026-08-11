@@ -1,0 +1,18 @@
+# CVFacil.NG CODEOWNERS
+# Aprovação obrigatória por área antes do merge em main/develop.
+
+# Segurança
+/backend/src/main/java/ng/cvfacil/config/      @cvfacil/security
+/backend/src/main/java/ng/cvfacil/security/    @cvfacil/security
+/backend/src/main/resources/db/migration/      @cvfacil/security @cvfacil/backend
+.github/workflows/                              @cvfacil/devops
+
+# Backend geral
+/backend/                                       @cvfacil/backend
+
+# Frontend
+/frontend/                                      @cvfacil/frontend
+
+# Documentação e PRD
+/docs/                                          @cvfacil/architecture
+*.md                                            @cvfacil/architecture

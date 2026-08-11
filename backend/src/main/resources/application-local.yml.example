@@ -1,0 +1,28 @@
+# Copie para application-local.yml (arquivo NÃO versionado).
+# Preencha os valores abaixo para rodar localmente.
+spring:
+  datasource:
+    url: jdbc:postgresql://localhost:5432/cvfacil
+    username: cvfacil_app
+    password: change-me
+  data:
+    redis:
+      url: redis://localhost:6379
+
+# Chaves JWT RS256 geradas localmente (use openssl ou keytool).
+# Em produção elas vêm do KMS/secret manager da Hostinger.
+cvfacil:
+  jwt:
+    issuer: http://localhost:8080
+    private-key: |
+      -----BEGIN PRIVATE KEY-----
+      REPLACE_WITH_LOCAL_PRIVATE_KEY
+      -----END PRIVATE KEY-----
+    public-key: |
+      -----BEGIN PUBLIC KEY-----
+      REPLACE_WITH_LOCAL_PUBLIC_KEY
+      -----END PUBLIC KEY-----
+  ai:
+    api-key: sk-REPLACE_WITH_YOUR_KEY
+  encryption:
+    master-key: base64:REPLACE_WITH_BASE64_32_BYTES

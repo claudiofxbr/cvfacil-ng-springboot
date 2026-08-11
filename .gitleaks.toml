@@ -1,0 +1,25 @@
+title = "CVFacil.NG gitleaks config"
+
+[[rules]]
+id   = "openai-key"
+description = "OpenAI API key"
+regex = '''sk-[A-Za-z0-9]{20,}'''
+tags = ["key", "ai"]
+
+[[rules]]
+id   = "google-oauth-secret"
+description = "Google OAuth client secret"
+regex = '''GOCSPX-[A-Za-z0-9_-]{20,}'''
+
+[[rules]]
+id   = "jwt-private-key"
+description = "Private key PEM"
+regex = '''-----BEGIN (RSA |EC )?PRIVATE KEY-----'''
+
+[allowlist]
+paths = [
+  '''\.env\.example$''',
+  '''application-local\.yml\.example$''',
+  '''docs/.*\.md$''',
+  '''\.gitleaks\.toml$'''
+]

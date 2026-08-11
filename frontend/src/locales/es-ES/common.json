@@ -1,0 +1,68 @@
+{
+  "app": {
+    "name": "CVFacil.NG",
+    "tagline": "Crea currículums modernos en minutos"
+  },
+  "nav": {
+    "home": "Inicio",
+    "templates": "Plantillas",
+    "dashboard": "Panel",
+    "login": "Iniciar sesión",
+    "logout": "Cerrar sesión",
+    "profile": "Mi perfil",
+    "settings": "Ajustes",
+    "language": "Idioma",
+    "myResumes": "Mis currículums"
+  },
+  "home": {
+    "heroTitle": "El currículum correcto, en el estilo que va contigo.",
+    "heroSubtitle": "9 plantillas modernas, importación con IA y acabado profesional. Todo en portugués, inglés o español.",
+    "cta": "Comenzar",
+    "ctaSecondary": "Ver plantillas"
+  },
+  "auth": {
+    "loginTitle": "Inicia sesión en CVFacil.NG",
+    "emailLabel": "Correo electrónico",
+    "passwordLabel": "Contraseña",
+    "submit": "Iniciar sesión",
+    "google": "Iniciar sesión con Google",
+    "orSeparator": "o continúa con email",
+    "noAccount": "¿No tienes cuenta?",
+    "createAccount": "Crear cuenta",
+    "forgotPassword": "Olvidé mi contraseña"
+  },
+  "dashboard": {
+    "title": "Mi panel",
+    "tabs": {
+      "templates": "Plantillas de Currículum",
+      "myResumes": "Mis Currículums",
+      "aiImport": "Importar con IA"
+    },
+    "filters": {
+      "palette": "Paleta",
+      "style": "Estilo",
+      "sort": "Ordenar por",
+      "search": "Buscar plantilla..."
+    },
+    "actions": {
+      "useTemplate": "Usar esta plantilla",
+      "preview": "Vista previa",
+      "favorite": "Favorito"
+    }
+  },
+  "photo": {
+    "title": "Foto 3x4 con marco",
+    "upload": "Subir foto",
+    "frame": "Marco",
+    "crop": "Recortar",
+    "rotate": "Girar",
+    "removeBg": "Quitar fondo"
+  },
+  "common": {
+    "loading": "Cargando...",
+    "error": "Algo salió mal",
+    "save": "Guardar",
+    "cancel": "Cancelar",
+    "confirm": "Confirmar"
+  }
+}

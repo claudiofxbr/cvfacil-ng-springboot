@@ -1,0 +1,138 @@
+spring:
+  application:
+    name: cvfacil-backend
+  profiles:
+    default: local
+  datasource:
+    # Em producao, DATABASE_URL/DATABASE_USERNAME/DATABASE_PASSWORD sao obrigatorios (Neon).
+    # Em dev "local" o DataSource e provido por LocalDatabaseConfig (Postgres embarcado),
+    # entao estes placeholders caem para "" e NAO sao usados (o @Bean @Primary vence).
+    url: ${DATABASE_URL:}
+    username: ${DATABASE_USERNAME:}
+    password: ${DATABASE_PASSWORD:}
+    hikari:
+      maximum-pool-size: 10
+      minimum-idle: 1
+      # Neon Cloud fecha conexoes inativas apos ~5 min.
+      # keepalive-time (ms): envia SELECT 1 a cada 30 s em conexoes ociosas,
+      # impedindo que o Neon as feche antes que o Hikari detecte a morte.
+      keepalive-time: 30000
+      # idle-timeout (ms): remove conexao ociosa apos 2 min (bem abaixo do limite Neon).
+      idle-timeout: 120000
+      # max-lifetime (ms): recicla a conexao apos 4 min (margem de seguranca antes dos 5 min Neon).
+      max-lifetime: 240000
+      # connection-timeout (ms): falha rapida — nao bloqueia threads por mais de 10 s.
+      connection-timeout: 10000
+      # Valida a conexao antes de entregar ao pool (custo minimo, evita dead-connection errors).
+      connection-test-query: SELECT 1
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    open-in-view: false
+    properties:
+      hibernate:
+        jdbc.time_zone: UTC
+        format_sql: false
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+    baseline-on-migrate: true
+  data:
+    redis:
+      url: ${REDIS_URL:redis://localhost:6379}
+  security:
+    oauth2:
+      client:
+        registration:
+          google:
+            # Em dev sem credenciais OAuth, os campos caem para vazio e a feature de login Google
+            # fica inativa mas o contexto sobe normalmente.
+            client-id: ${GOOGLE_OAUTH_CLIENT_ID:}
+            client-secret: ${GOOGLE_OAUTH_CLIENT_SECRET:}
+            scope: openid,email,profile
+        provider:
+          google:
+            issuer-uri: https://accounts.google.com
+  mail:
+    host: ${SMTP_HOST:smtp.example.com}
+    port: ${SMTP_PORT:587}
+    username: ${SMTP_USERNAME:}
+    password: ${SMTP_PASSWORD:}
+    properties:
+      mail:
+        smtp:
+          auth: true
+          starttls.enable: true
+
+  servlet:
+    multipart:
+      # Importação de currículo via IA aceita PDF/DOCX até 10 MB
+      max-file-size: 10MB
+      max-request-size: 10MB
+
+server:
+  port: 8080
+  error:
+    include-message: never
+    include-stacktrace: never
+  forward-headers-strategy: framework
+  http2:
+    enabled: true
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus
+  endpoint:
+    health:
+      show-details: never
+
+cvfacil:
+  jwt:
+    issuer: ${JWT_ISSUER:https://cvfacil.ng}
+    access-ttl-minutes: ${JWT_ACCESS_TTL_MINUTES:15}
+    refresh-ttl-days: ${JWT_REFRESH_TTL_DAYS:7}
+    private-key: ${JWT_PRIVATE_KEY:}
+    public-key: ${JWT_PUBLIC_KEY:}
+  ai:
+    provider: ${AI_PROVIDER:openai}
+    base-url: ${AI_API_BASE_URL:https://api.openai.com/v1}
+    api-key: ${AI_API_KEY:}
+    model: ${AI_MODEL:gpt-4o-mini}
+  ocr:
+    # Habilitar OCR para PDFs escaneados (sem camada de texto).
+    # Requer Tesseract 5 instalado no SO com pacotes de idioma.
+    #   Ubuntu : sudo apt install tesseract-ocr tesseract-ocr-por
+    #   Windows: https://github.com/UB-Mannheim/tesseract/wiki
+    #   macOS  : brew install tesseract tesseract-lang
+    enabled: ${OCR_ENABLED:false}
+    # Caminho do diretorio tessdata. Vazio = usa o padrao do sistema.
+    #   Linux  : /usr/share/tesseract-ocr/5/tessdata
+    #   Windows: C:/Program Files/Tesseract-OCR/tessdata
+    tessdata-path: ${TESSERACT_DATA_PATH:}
+    language: ${TESSERACT_LANGUAGE:por+eng}
+    dpi: ${TESSERACT_DPI:300}
+  security:
+    cors-allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:3000}
+    # Em produção (HTTPS) deve ser true. Em dev local (HTTP) use false para que
+    # o browser aceite o cookie de refresh em http://localhost.
+    cookie-secure: ${COOKIE_SECURE:true}
+    rate-limit-login-per-minute: 5
+  root:
+    ip-allowlist: ${ROOT_IP_ALLOWLIST:}
+    mfa-issuer: ${ROOT_MFA_ISSUER:CVFacil.NG Root}
+  encryption:
+    master-key: ${ENCRYPTION_MASTER_KEY:}
+  frontend:
+    # Base do frontend usada para montar o link de redefinição de senha
+    # enviado por e-mail (/reset-password?token=...).
+    base-url: ${FRONTEND_BASE_URL:http://localhost:3000}
+
+logging:
+  level:
+    root: INFO
+    ng.cvfacil: DEBUG
+    org.springframework.security: INFO
+  pattern:
+    console: '{"ts":"%d{yyyy-MM-dd''T''HH:mm:ss.SSSXXX}","level":"%p","traceId":"%X{traceId:-}","logger":"%c{1}","msg":"%m"}%n'

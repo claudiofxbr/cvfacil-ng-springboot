@@ -1,0 +1,58 @@
+# Node / Next.js
+node_modules/
+.next/
+out/
+.turbo/
+*.tsbuildinfo
+coverage/
+.eslintcache
+
+# Env (NUNCA commitar segredos)
+.env
+.env.local
+.env.*.local
+!.env.example
+!.env.local.example
+frontend/.env.local
+backend/src/main/resources/application-local.yml
+
+# Java / Maven / Gradle
+target/
+build/
+.gradle/
+!gradle/wrapper/gradle-wrapper.jar
+.mvn/wrapper/maven-wrapper.jar
+
+# IDE
+.idea/
+.vscode/
+*.iml
+*.ipr
+*.iws
+.classpath
+.project
+.settings/
+.factorypath
+
+# Sistema
+.DS_Store
+Thumbs.db
+*.log
+
+# Logs & temp
+logs/
+tmp/
+*.tmp
+.runtime/
+
+# Segredos
+secrets/
+*.pem
+*.key
+*.p12
+
+# Artefatos de build local
+dist/
+*.jar
+!mvnw.jar
+!gradle-wrapper.jar

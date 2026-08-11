@@ -1,0 +1,68 @@
+{
+  "app": {
+    "name": "CVFacil.NG",
+    "tagline": "Build modern resumes in minutes"
+  },
+  "nav": {
+    "home": "Home",
+    "templates": "Templates",
+    "dashboard": "Dashboard",
+    "login": "Sign in",
+    "logout": "Sign out",
+    "profile": "My profile",
+    "settings": "Settings",
+    "language": "Language",
+    "myResumes": "My resumes"
+  },
+  "home": {
+    "heroTitle": "The right resume, in the style that suits you.",
+    "heroSubtitle": "9 modern templates, AI-powered import and a polished finish. All in Portuguese, English or Spanish.",
+    "cta": "Get started",
+    "ctaSecondary": "See templates"
+  },
+  "auth": {
+    "loginTitle": "Sign in to CVFacil.NG",
+    "emailLabel": "Email",
+    "passwordLabel": "Password",
+    "submit": "Sign in",
+    "google": "Sign in with Google",
+    "orSeparator": "or continue with email",
+    "noAccount": "Don't have an account?",
+    "createAccount": "Create account",
+    "forgotPassword": "Forgot password"
+  },
+  "dashboard": {
+    "title": "My dashboard",
+    "tabs": {
+      "templates": "Resume Templates",
+      "myResumes": "My Resumes",
+      "aiImport": "AI Import"
+    },
+    "filters": {
+      "palette": "Palette",
+      "style": "Style",
+      "sort": "Sort by",
+      "search": "Search template..."
+    },
+    "actions": {
+      "useTemplate": "Use this template",
+      "preview": "Preview",
+      "favorite": "Favorite"
+    }
+  },
+  "photo": {
+    "title": "3x4 photo with frame",
+    "upload": "Upload photo",
+    "frame": "Frame",
+    "crop": "Crop",
+    "rotate": "Rotate",
+    "removeBg": "Remove background"
+  },
+  "common": {
+    "loading": "Loading...",
+    "error": "Something went wrong",
+    "save": "Save",
+    "cancel": "Cancel",
+    "confirm": "Confirm"
+  }
+}

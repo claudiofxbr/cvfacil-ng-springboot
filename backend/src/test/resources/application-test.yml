@@ -1,0 +1,32 @@
+# Configurações de integração de testes.
+# Ativo quando @ActiveProfiles("local") é usado nos testes.
+# Herda application.yml e application-local.yml, sobrepostos aqui.
+
+spring:
+  flyway:
+    # Garante que o schema é sempre criado do zero durante os testes.
+    baseline-on-migrate: true
+  mail:
+    # Desabilita SMTP nos testes
+    host: localhost
+    port: 25
+
+cvfacil:
+  jwt:
+    issuer: https://test.cvfacil.ng
+    access-ttl-minutes: 15
+    refresh-ttl-days: 7
+    # Sem JWT_PRIVATE_KEY nos testes → modo STUB (aceito por LocalResumeController)
+    private-key: ""
+    public-key: ""
+  security:
+    cors-allowed-origins: http://localhost:3000
+    cookie-secure: false
+  ocr:
+    enabled: false
+
+logging:
+  level:
+    root: WARN
+    ng.cvfacil: INFO
+    org.springframework.security: WARN
