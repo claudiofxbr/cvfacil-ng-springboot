@@ -19,8 +19,8 @@ import org.springframework.web.multipart.MultipartFile;
  * de JWT (LocalSecurityConfig já abre todos os endpoints com .anyRequest().permitAll() em dev
  * local).
  *
- * <p>Para ativar a IA em dev local, adicione em application-local.yml: cvfacil: ai: api-key:
- * "sk-..." # OpenAI key model: "gpt-4o-mini" # ou outro modelo
+ * <p>Para ativar a IA em dev local, preencha cvfacil.ai.api-key em application-local.yml (provider
+ * padrao ja configurado como "gemini").
  */
 @RestController
 @RequestMapping("/api/ai-import")

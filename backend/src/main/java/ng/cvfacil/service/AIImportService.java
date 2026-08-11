@@ -30,8 +30,8 @@ import org.springframework.stereotype.Service;
  *
  * <p>PIPELINE: 1. Extracao de texto -> PDFBox (PDF) | Apache POI (DOCX) | UTF-8 plain (TXT) 2.
  * Fallback OCR -> Tesseract 5 via tess4j (PDFs escaneados sem camada de texto) 3. Chamada ao LLM ->
- * OpenAI Chat Completions API ou Anthropic Messages API 4. Normalizacao JSON -> garante schema
- * exato esperado pelo editor do CVFacil.NG
+ * OpenAI Chat Completions API, Anthropic Messages API ou Google Gemini generateContent API 4.
+ * Normalizacao JSON -> garante schema exato esperado pelo editor do CVFacil.NG
  *
  * <p>SEGURANCA: - A API key NUNCA e exposta ao frontend. - O texto do curriculo e enviado
  * diretamente ao LLM e nao e armazenado. - Timeout de 90 s; erros de rede retornam excecao
@@ -49,8 +49,9 @@ import org.springframework.stereotype.Service;
  *
  * <p>PROVEDORES SUPORTADOS: - OpenAI (padrao): AI_PROVIDER=openai
  * AI_API_BASE_URL=https://api.openai.com/v1 - Anthropic Claude: AI_PROVIDER=anthropic
- * AI_API_BASE_URL=https://api.anthropic.com/v1 - Qualquer provider OpenAI-compatible (Groq,
- * Together, etc.): defina AI_API_BASE_URL.
+ * AI_API_BASE_URL=https://api.anthropic.com/v1 - Google Gemini: AI_PROVIDER=gemini
+ * AI_API_BASE_URL=https://generativelanguage.googleapis.com/v1beta - Qualquer provider
+ * OpenAI-compatible (Groq, Together, etc.): defina AI_API_BASE_URL.
  */
 @Service
 public class AIImportService {
@@ -350,9 +351,9 @@ public class AIImportService {
   String parseWithAI(String rawText) throws Exception {
     // Limita o texto a ~16 000 caracteres para nao exceder o contexto do modelo
     String truncated = rawText.length() > 16_000 ? rawText.substring(0, 16_000) : rawText;
-    return "anthropic".equalsIgnoreCase(provider)
-        ? callAnthropic(truncated)
-        : callOpenAI(truncated);
+    if ("anthropic".equalsIgnoreCase(provider)) return callAnthropic(truncated);
+    if ("gemini".equalsIgnoreCase(provider)) return callGemini(truncated);
+    return callOpenAI(truncated);
   }
 
   private String callOpenAI(String text) throws Exception {
@@ -424,6 +425,60 @@ public class AIImportService {
     }
 
     return mapper.readTree(response.body()).at("/content/0/text").asText();
+  }
+
+  private String callGemini(String text) throws Exception {
+    // "gemini-2.5-flash" fixo retorna 404 para chaves de contas novas (modelo com
+    // acesso restrito); o alias "gemini-flash-latest" resolve para o Flash vigente
+    // e funciona para qualquer chave — usado como fallback mais seguro.
+    String effectiveModel = model.isBlank() ? "gemini-flash-latest" : model;
+    // base-url deve apontar para a raiz da API (ex.: https://generativelanguage.googleapis.com/v1beta),
+    // sem o segmento /models/{model}:generateContent — este metodo o monta.
+    String url = baseUrl.replaceAll("/+$", "") + "/models/" + effectiveModel + ":generateContent";
+
+    ObjectNode part = mapper.createObjectNode().put("text", text);
+    ObjectNode content = mapper.createObjectNode();
+    content.set("parts", mapper.createArrayNode().add(part));
+    ArrayNode contents = mapper.createArrayNode().add(content);
+
+    ObjectNode systemInstruction = mapper.createObjectNode();
+    systemInstruction.set(
+        "parts", mapper.createArrayNode().add(mapper.createObjectNode().put("text", SYSTEM_PROMPT)));
+
+    ObjectNode generationConfig = mapper.createObjectNode();
+    generationConfig.put("temperature", 0.1);
+    generationConfig.put("maxOutputTokens", 4000);
+    generationConfig.put("responseMimeType", "application/json");
+
+    ObjectNode body = mapper.createObjectNode();
+    body.set("contents", contents);
+    body.set("systemInstruction", systemInstruction);
+    body.set("generationConfig", generationConfig);
+
+    HttpRequest request =
+        HttpRequest.newBuilder()
+            .uri(URI.create(url))
+            .header("x-goog-api-key", apiKey)
+            .header("Content-Type", "application/json")
+            .header("Accept", "application/json")
+            .timeout(Duration.ofSeconds(90))
+            .POST(HttpRequest.BodyPublishers.ofString(mapper.writeValueAsString(body)))
+            .build();
+
+    HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+
+    if (response.statusCode() != 200) {
+      log.error("[AI Import] Gemini retornou HTTP {}: {}", response.statusCode(), response.body());
+      throw new RuntimeException(
+          "Erro na API Gemini (HTTP "
+              + response.statusCode()
+              + "). Verifique a API key e o modelo configurado.");
+    }
+
+    return mapper
+        .readTree(response.body())
+        .at("/candidates/0/content/parts/0/text")
+        .asText();
   }
 
   // ── Normalizacao do JSON ────────────────────────────────────────────────────
