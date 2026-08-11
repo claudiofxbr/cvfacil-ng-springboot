@@ -92,17 +92,44 @@
     @apply antialiased;
   }
 
-  /* Header */
-  [data-theme] header {
+  /*
+   * Header/aside do APP-SHELL (nav, sidebar) — nao do preview de curriculo.
+   * .resume-layout (ResumeLayout.jsx) tambem carrega data-theme (id da paleta
+   * do curriculo, ex. "navyClassic"), e suas variantes HeaderVariant/BandVariant/
+   * SplitVariant usam <header>/<aside> HTML puro com cor de fundo inline
+   * (theme.primary/secondary) + texto branco (theme.onPrimary/onSecondary).
+   * Sem o :not() abaixo, essas regras (pensadas so para o chrome do app)
+   * vazam para dentro do preview e sobrescrevem o fundo colorido com um
+   * fundo quase-branco via !important, deixando o texto branco invisivel.
+   */
+  [data-theme] header:not(.resume-layout header) {
     background: var(--theme-header-bg) !important;
     border-color: var(--theme-border) !important;
   }
-  [data-theme] header a,
-  [data-theme] header nav a {
+  [data-theme] header:not(.resume-layout header) a,
+  [data-theme] header:not(.resume-layout header) nav a {
     color: var(--theme-text) !important;
   }
-  [data-theme] header nav a:hover {
+  [data-theme] header:not(.resume-layout header) nav a:hover {
     background-color: var(--theme-bg-hover) !important;
+  }
+
+  /* Sidebar do dashboard (aside) — mesmo tratamento do header */
+  [data-theme] aside:not(.resume-layout aside) {
+    background: var(--theme-bg-card) !important;
+    border-color: var(--theme-border) !important;
+  }
+  [data-theme] aside:not(.resume-layout aside) a {
+    color: var(--theme-text-muted) !important;
+  }
+  [data-theme] aside:not(.resume-layout aside) a:hover {
+    background-color: var(--theme-bg-hover) !important;
+    color: var(--theme-text) !important;
+  }
+  [data-theme] aside:not(.resume-layout aside) a.text-brand-700,
+  [data-theme] aside:not(.resume-layout aside) a[class*='bg-brand-50'] {
+    background-color: var(--theme-brand-accent) !important;
+    color: var(--theme-brand) !important;
   }
 
   /* Cards */
