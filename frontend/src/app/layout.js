@@ -39,7 +39,12 @@ export default function RootLayout({ children }) {
     <html lang="pt-BR">
       {/* Script de tema executado antes do CSS/JS do React — elimina flash */}
       <head>
-        {/* eslint-disable-next-line @next/next/no-before-interactive-script-outside-document */}
+        {/*
+          eslint-disable-next-line react/no-danger, @next/next/no-before-interactive-script-outside-document --
+          THEME_SCRIPT é uma constante estática definida neste arquivo, sem nenhuma interpolação de
+          dado externo/usuário — não há risco de XSS aqui. A regra react/no-danger continua valendo
+          para qualquer outro uso de dangerouslySetInnerHTML no restante do app.
+        */}
         <script dangerouslySetInnerHTML={{ __html: THEME_SCRIPT }} />
       </head>
       <body>
