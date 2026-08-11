@@ -79,12 +79,15 @@ public class CreditService {
   }
 
   /**
-   * Consome 1 crédito para criar um currículo.
+   * Consome 1 crédito para criar um currículo. ADMIN/ROOT_MASTER são isentos (ver {@link
+   * #hasUnlimitedCredits}) — criação, edição, exclusão e impressão do próprio currículo desses
+   * perfis nunca são bloqueadas por saldo.
    *
-   * @throws InsufficientCreditsException se o saldo for zero.
+   * @throws InsufficientCreditsException se o saldo for zero (perfis sem isenção).
    */
   @Transactional
   public void consumeOneForResumeCreation(UUID userId) {
+    if (hasUnlimitedCredits(userId)) return;
     int updated = users.decrementOneCreditIfAvailable(userId);
     if (updated == 0) throw new InsufficientCreditsException();
     int balance = users.findById(userId).map(User::getCredits).orElse(0);
@@ -94,6 +97,14 @@ public class CreditService {
     tx.setAmount(-1);
     tx.setBalanceAfter(balance);
     transactions.save(tx);
+  }
+
+  /** ADMIN e ROOT_MASTER não têm limite de créditos para currículos próprios. */
+  public boolean hasUnlimitedCredits(UUID userId) {
+    return users
+        .findById(userId)
+        .map(u -> u.getRole() == User.Role.ADMIN || u.getRole() == User.Role.ROOT_MASTER)
+        .orElse(false);
   }
 
   public int balanceOf(UUID userId) {

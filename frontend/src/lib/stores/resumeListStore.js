@@ -70,6 +70,10 @@ export const useResumeListStore = create(
               if (e.status === 404) {
                 // Backend não conhece este id (ex: localStorage de outro device) → cria
                 saved = await api.post('/api/resumes', payload);
+              } else if (e.status === 402) {
+                // Sem créditos: já não deveria ocorrer em update (currículo já existe),
+                // mas propaga mesmo assim — o editor decide como avisar o usuário.
+                throw e;
               }
               // 401 → não autenticado, mantém apenas local
             }
@@ -77,8 +81,11 @@ export const useResumeListStore = create(
             // Novo currículo → cria no backend
             try {
               saved = await api.post('/api/resumes', payload);
-            } catch {
-              // Falha silenciosa
+            } catch (e) {
+              // 402 = sem créditos: o currículo fica só local (não sincroniza) até o
+              // usuário comprar mais créditos — precisa chegar ao editor para avisar,
+              // diferente das demais falhas (rede, 401), que continuam silenciosas.
+              if (e.status === 402) throw e;
             }
           }
 
@@ -91,8 +98,10 @@ export const useResumeListStore = create(
             }));
             finalId = saved.id;
           }
-        } catch {
-          // Falha silenciosa — dado já está salvo localmente
+        } catch (e) {
+          // 402 (sem créditos) precisa avisar o usuário — repassa ao chamador.
+          // Demais falhas (rede, 401): silenciosas, dado já está salvo localmente.
+          if (e.status === 402) throw e;
         }
 
         return finalId;

@@ -17,8 +17,9 @@ final class CreditRequestSupport {
 
   static ResponseEntity<WalletView> wallet(CreditService credits, UUID userId) {
     int balance = credits.balanceOf(userId);
+    boolean unlimited = credits.hasUnlimitedCredits(userId);
     var history = credits.historyOf(userId).stream().map(CreditRequestSupport::toView).toList();
-    return ResponseEntity.ok(new WalletView(balance, history));
+    return ResponseEntity.ok(new WalletView(balance, unlimited, history));
   }
 
   /**

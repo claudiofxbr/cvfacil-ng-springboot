@@ -8,7 +8,7 @@ import ng.cvfacil.domain.CreditPackage;
 
 public class CreditDtos {
 
-  public record WalletView(int balance, List<TransactionView> history) {}
+  public record WalletView(int balance, boolean unlimited, List<TransactionView> history) {}
 
   public record TransactionView(
       UUID id, String type, int amount, int balanceAfter, String reference, Instant createdAt) {}
