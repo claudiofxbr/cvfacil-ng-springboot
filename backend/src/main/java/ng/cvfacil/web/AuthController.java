@@ -6,22 +6,31 @@ import java.time.Duration;
 import java.util.Map;
 import java.util.UUID;
 import ng.cvfacil.domain.User;
+import ng.cvfacil.dto.AuthDtos.ChangePasswordRequest;
 import ng.cvfacil.dto.AuthDtos.ForgotPasswordRequest;
 import ng.cvfacil.dto.AuthDtos.LoginRequest;
 import ng.cvfacil.dto.AuthDtos.LoginResponse;
+import ng.cvfacil.dto.AuthDtos.MfaChallengeResponse;
+import ng.cvfacil.dto.AuthDtos.MfaVerifyRequest;
 import ng.cvfacil.dto.AuthDtos.RegisterRequest;
 import ng.cvfacil.dto.AuthDtos.ResetPasswordRequest;
+import ng.cvfacil.dto.AuthDtos.SecurityStatus;
 import ng.cvfacil.dto.AuthDtos.UserView;
 import ng.cvfacil.repository.UserRepository;
 import ng.cvfacil.security.JwtService;
 import ng.cvfacil.service.AuditService;
 import ng.cvfacil.service.CreditService;
+import ng.cvfacil.service.MfaService;
+import ng.cvfacil.service.PasswordPolicyService;
+import ng.cvfacil.service.PasswordPolicyService.PolicyViolationException;
 import ng.cvfacil.service.PasswordResetService;
 import ng.cvfacil.service.RateLimitService;
+import ng.cvfacil.service.RootIpAllowlistService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.ResponseCookie;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
@@ -39,6 +48,9 @@ public class AuthController {
   private final RateLimitService rateLimit;
   private final PasswordResetService passwordReset;
   private final CreditService credits;
+  private final MfaService mfa;
+  private final PasswordPolicyService passwordPolicy;
+  private final RootIpAllowlistService ipAllowlist;
 
   /**
    * JwtDecoder apenas disponível no profile "!local" (SecurityConfig). Injetado de forma opcional
@@ -58,7 +70,10 @@ public class AuthController {
       AuditService audit,
       RateLimitService rateLimit,
       PasswordResetService passwordReset,
-      CreditService credits) {
+      CreditService credits,
+      MfaService mfa,
+      PasswordPolicyService passwordPolicy,
+      RootIpAllowlistService ipAllowlist) {
     this.users = users;
     this.encoder = encoder;
     this.jwt = jwt;
@@ -66,6 +81,9 @@ public class AuthController {
     this.rateLimit = rateLimit;
     this.passwordReset = passwordReset;
     this.credits = credits;
+    this.mfa = mfa;
+    this.passwordPolicy = passwordPolicy;
+    this.ipAllowlist = ipAllowlist;
   }
 
   @PostMapping("/register")
@@ -124,13 +142,159 @@ public class AuthController {
     u.setLockedUntil(null);
     users.save(u);
 
+    // PRD §4.4: RootMaster só autentica de IPs cadastrados na allowlist (quando ela
+    // não estiver vazia — ver RootIpAllowlistService).
+    if (u.getRole() == User.Role.ROOT_MASTER && !ipAllowlist.isAllowed(ip)) {
+      audit.record(u.getId(), "LOGIN_ROOT_IP_BLOCKED", ip, http.getHeader("User-Agent"), null);
+      return ResponseEntity.status(403).build();
+    }
+
+    if (u.isMfaEnabled()) {
+      String challenge = jwt.issueMfaChallengeToken(u.getId());
+      audit.record(u.getId(), "LOGIN_MFA_CHALLENGE", ip, http.getHeader("User-Agent"), null);
+      return ResponseEntity.status(202).body(new MfaChallengeResponse(true, challenge));
+    }
+
+    return issueSession(u, ip, http.getHeader("User-Agent"));
+  }
+
+  /** Segundo fator: troca o challengeToken de 5 min por um código TOTP válido de 6 dígitos. */
+  @PostMapping("/mfa-verify")
+  public ResponseEntity<?> mfaVerify(
+      @Valid @RequestBody MfaVerifyRequest req, HttpServletRequest http) {
+    String ip = http.getRemoteAddr();
+    UUID userId = decodeTypedToken(req.challengeToken(), "STUB_MFA.", "mfa_challenge");
+    if (userId == null) return ResponseEntity.status(401).build();
+
+    User u = users.findById(userId).orElse(null);
+    if (u == null || !u.isMfaEnabled()) return ResponseEntity.status(401).build();
+
+    if (!mfa.verifyLoginCode(u, req.code())) {
+      audit.record(userId, "LOGIN_MFA_FAILURE", ip, http.getHeader("User-Agent"), null);
+      return ResponseEntity.status(401).build();
+    }
+
+    return issueSession(u, ip, http.getHeader("User-Agent"));
+  }
+
+  /** Troca de senha self-service (usuário já autenticado) — aplica PasswordPolicyService. */
+  @PostMapping("/change-password")
+  public ResponseEntity<?> changePassword(
+      @Valid @RequestBody ChangePasswordRequest req,
+      @AuthenticationPrincipal Jwt principal,
+      HttpServletRequest http) {
+    UUID userId = resolveUserId(principal, http);
+    if (userId == null) return ResponseEntity.status(401).build();
+    User u = users.findById(userId).orElse(null);
+    if (u == null || u.getPasswordHash() == null) return ResponseEntity.status(401).build();
+
+    if (!encoder.matches(req.currentPassword(), u.getPasswordHash())) {
+      return ResponseEntity.status(401).build();
+    }
+    try {
+      passwordPolicy.validateNewPassword(u, req.newPassword());
+    } catch (PolicyViolationException e) {
+      return ResponseEntity.status(422).body(Map.of("error", e.getMessage()));
+    }
+
+    passwordPolicy.recordChange(userId, u.getPasswordHash());
+    u.setPasswordHash(encoder.encode(req.newPassword()));
+    u.setPasswordChangedAt(java.time.Instant.now());
+    users.save(u);
+    audit.record(
+        userId, "PASSWORD_CHANGED", http.getRemoteAddr(), http.getHeader("User-Agent"), null);
+    return ResponseEntity.ok().build();
+  }
+
+  /**
+   * Reconfirma a senha do usuário já autenticado sem alterar nada — usado pelo timer de inatividade
+   * de 5 min (PRD): ao expirar, o usuário digita a senha para continuar de onde parou, em vez de
+   * ser deslogado e perder o trabalho não salvo.
+   */
+  @PostMapping("/verify-password")
+  public ResponseEntity<Void> verifyPassword(
+      @Valid @RequestBody ng.cvfacil.dto.AuthDtos.VerifyPasswordRequest req,
+      @AuthenticationPrincipal Jwt principal,
+      HttpServletRequest http) {
+    UUID userId = resolveUserId(principal, http);
+    if (userId == null) return ResponseEntity.status(401).build();
+    User u = users.findById(userId).orElse(null);
+    if (u == null || u.getPasswordHash() == null) return ResponseEntity.status(401).build();
+    return encoder.matches(req.password(), u.getPasswordHash())
+        ? ResponseEntity.ok().build()
+        : ResponseEntity.status(401).build();
+  }
+
+  /** Estado de segurança da conta logada — alimenta a página /dashboard/security do frontend. */
+  @GetMapping("/security-status")
+  public ResponseEntity<SecurityStatus> securityStatus(
+      @AuthenticationPrincipal Jwt principal, HttpServletRequest http) {
+    UUID userId = resolveUserId(principal, http);
+    if (userId == null) return ResponseEntity.status(401).build();
+    User u = users.findById(userId).orElse(null);
+    if (u == null) return ResponseEntity.status(401).build();
+    return ResponseEntity.ok(
+        new SecurityStatus(
+            u.isMfaEnabled(),
+            passwordPolicy.passwordAgeDays(u),
+            passwordPolicy.rotationOverdue(u),
+            u.getRole().name()));
+  }
+
+  private ResponseEntity<LoginResponse> issueSession(User u, String ip, String userAgent) {
     String access = jwt.issueAccessToken(u);
     String refresh = jwt.issueRefreshToken(u.getId());
-
-    audit.record(u.getId(), "LOGIN_SUCCESS", ip, http.getHeader("User-Agent"), null);
+    audit.record(u.getId(), "LOGIN_SUCCESS", ip, userAgent, null);
     return ResponseEntity.ok()
         .header("Set-Cookie", buildRefreshCookie(refresh).toString())
         .body(new LoginResponse(view(u), access));
+  }
+
+  /**
+   * Resolve o userId autenticado tanto em produção (Jwt principal real) quanto em dev local (STUB
+   * token no header — não há JwtDecoder/resource server configurado em @Profile("local")). Mesmo
+   * padrão usado em LocalAdminController.
+   */
+  private UUID resolveUserId(Jwt principal, HttpServletRequest request) {
+    if (principal != null) {
+      try {
+        return UUID.fromString(principal.getSubject());
+      } catch (Exception ignored) {
+      }
+    }
+    String auth = request.getHeader("Authorization");
+    if (auth != null && auth.startsWith("Bearer STUB_ACCESS.")) {
+      String[] parts = auth.substring("Bearer ".length()).split("\\.", 3);
+      if (parts.length >= 2) {
+        try {
+          return UUID.fromString(parts[1]);
+        } catch (Exception ignored) {
+        }
+      }
+    }
+    return null;
+  }
+
+  /** Decodifica um token com claim "type", aceitando o formato STUB legado em dev local. */
+  private UUID decodeTypedToken(String token, String stubPrefix, String expectedType) {
+    if (token == null || token.isBlank()) return null;
+    if (token.startsWith(stubPrefix)) {
+      String[] parts = token.split("\\.", 3);
+      if (parts.length < 3) return null;
+      try {
+        return UUID.fromString(parts[1]);
+      } catch (IllegalArgumentException e) {
+        return null;
+      }
+    }
+    if (jwtDecoder == null) return null;
+    try {
+      Jwt decoded = jwtDecoder.decode(token);
+      if (!expectedType.equals(decoded.getClaimAsString("type"))) return null;
+      return UUID.fromString(decoded.getSubject());
+    } catch (JwtException | IllegalArgumentException e) {
+      return null;
+    }
   }
 
   /**
@@ -147,39 +311,8 @@ public class AuthController {
   public ResponseEntity<LoginResponse> refresh(
       @CookieValue(name = "refresh_token", required = false) String refreshToken) {
 
-    if (refreshToken == null || refreshToken.isBlank()) {
-      return ResponseEntity.status(401).build();
-    }
-
-    UUID userId;
-
-    if (refreshToken.startsWith("STUB_REFRESH.")) {
-      // Formato legado de dev local — sem validação criptográfica
-      String[] parts = refreshToken.split("\\.", 3);
-      if (parts.length < 3) return ResponseEntity.status(401).build();
-      try {
-        userId = UUID.fromString(parts[1]);
-      } catch (IllegalArgumentException e) {
-        return ResponseEntity.status(401).build();
-      }
-    } else {
-      // Token RS256 real — valida assinatura e claims via JwtDecoder (produção)
-      if (jwtDecoder == null) {
-        // Em dev sem JwtDecoder configurado e token não é STUB → rejeita
-        return ResponseEntity.status(401).build();
-      }
-      try {
-        Jwt decoded = jwtDecoder.decode(refreshToken);
-        // Verifica que é um refresh token (não um access token reutilizado)
-        String type = decoded.getClaimAsString("type");
-        if (!"refresh".equals(type)) {
-          return ResponseEntity.status(401).build();
-        }
-        userId = UUID.fromString(decoded.getSubject());
-      } catch (JwtException | IllegalArgumentException e) {
-        return ResponseEntity.status(401).build();
-      }
-    }
+    UUID userId = decodeTypedToken(refreshToken, "STUB_REFRESH.", "refresh");
+    if (userId == null) return ResponseEntity.status(401).build();
 
     User u = users.findById(userId).orElse(null);
     if (u == null) return ResponseEntity.status(401).build();
@@ -238,7 +371,12 @@ public class AuthController {
 
   private UserView view(User u) {
     return new UserView(
-        u.getId(), u.getEmail(), u.getDisplayName(), u.getRole().name(), u.getLocale());
+        u.getId(),
+        u.getEmail(),
+        u.getDisplayName(),
+        u.getRole().name(),
+        u.getLocale(),
+        u.isMfaEnabled());
   }
 
   @ResponseStatus(org.springframework.http.HttpStatus.UNAUTHORIZED)

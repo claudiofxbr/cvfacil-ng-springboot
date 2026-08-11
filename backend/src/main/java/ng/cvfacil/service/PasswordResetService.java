@@ -39,6 +39,7 @@ public class PasswordResetService {
   private final PasswordEncoder encoder;
   private final JavaMailSender mailSender;
   private final AuditService audit;
+  private final PasswordPolicyService passwordPolicy;
 
   @Value("${cvfacil.frontend.base-url:http://localhost:3000}")
   private String frontendBaseUrl;
@@ -51,12 +52,14 @@ public class PasswordResetService {
       PasswordResetTokenRepository tokens,
       PasswordEncoder encoder,
       JavaMailSender mailSender,
-      AuditService audit) {
+      AuditService audit,
+      PasswordPolicyService passwordPolicy) {
     this.users = users;
     this.tokens = tokens;
     this.encoder = encoder;
     this.mailSender = mailSender;
     this.audit = audit;
+    this.passwordPolicy = passwordPolicy;
   }
 
   /**
@@ -97,7 +100,15 @@ public class PasswordResetService {
     User user = users.findById(entity.getUserId()).orElse(null);
     if (user == null) return false;
 
+    try {
+      passwordPolicy.validateNewPassword(user, newPassword);
+    } catch (PasswordPolicyService.PolicyViolationException e) {
+      return false;
+    }
+
+    passwordPolicy.recordChange(user.getId(), user.getPasswordHash());
     user.setPasswordHash(encoder.encode(newPassword));
+    user.setPasswordChangedAt(Instant.now());
     user.setFailedLogins(0);
     user.setLockedUntil(null);
     users.save(user);

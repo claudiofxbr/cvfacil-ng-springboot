@@ -59,6 +59,9 @@ public class LocalAdminController {
     if (actingUserId == null || role != User.Role.ROOT_MASTER) {
       return ResponseEntity.status(403).build();
     }
+    if (!service.rootHasMfaEnabled(actingUserId)) {
+      return ResponseEntity.status(403).build();
+    }
     return service.deleteUser(actingUserId, role, id)
         ? ResponseEntity.noContent().build()
         : ResponseEntity.notFound().build();
@@ -73,6 +76,9 @@ public class LocalAdminController {
     UUID actingUserId = resolveUserId(principal, request);
     User.Role role = roleOf(principal, request);
     if (actingUserId == null || role != User.Role.ROOT_MASTER) {
+      return ResponseEntity.status(403).build();
+    }
+    if (!service.rootHasMfaEnabled(actingUserId)) {
       return ResponseEntity.status(403).build();
     }
     boolean ok = credits.grantByRoot(actingUserId, role, id, req.amount());

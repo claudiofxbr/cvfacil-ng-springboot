@@ -149,6 +149,34 @@ public class JwtService {
     }
   }
 
+  /**
+   * Token de curta duração (5 min) emitido no primeiro fator de login quando o usuário tem MFA
+   * ativo — só serve para POST /api/auth/mfa-verify, nunca concede acesso à API por si só.
+   */
+  public String issueMfaChallengeToken(UUID userId) {
+    if (signer == null) {
+      return "STUB_MFA." + userId + "." + UUID.randomUUID();
+    }
+    try {
+      Instant now = Instant.now();
+      JWTClaimsSet claims =
+          new JWTClaimsSet.Builder()
+              .issuer(issuer)
+              .subject(userId.toString())
+              .claim("type", "mfa_challenge")
+              .issueTime(Date.from(now))
+              .expirationTime(Date.from(now.plus(Duration.ofMinutes(5))))
+              .jwtID(UUID.randomUUID().toString())
+              .build();
+      SignedJWT jwt = new SignedJWT(new JWSHeader(JWSAlgorithm.RS256), claims);
+      jwt.sign(signer);
+      return jwt.serialize();
+    } catch (Exception e) {
+      throw new IllegalStateException(
+          "[JwtService] Erro ao assinar mfa challenge token: " + e.getMessage(), e);
+    }
+  }
+
   /** {@code true} quando a chave privada está carregada e tokens RS256 reais são emitidos. */
   public boolean isRealSigningActive() {
     return signer != null;

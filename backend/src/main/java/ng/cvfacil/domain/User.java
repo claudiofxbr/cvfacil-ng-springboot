@@ -61,6 +61,14 @@ public class User {
   @Column(name = "locked_until")
   private Instant lockedUntil;
 
+  /** true somente após confirmação do código TOTP em /api/mfa/confirm — ver MfaService. */
+  @Column(name = "mfa_enabled", nullable = false)
+  private boolean mfaEnabled;
+
+  /** Usado para o aviso de rotação de 90 dias do RootMaster (PRD §4.4). */
+  @Column(name = "password_changed_at", nullable = false)
+  private Instant passwordChangedAt = Instant.now();
+
   @Column(name = "created_at", nullable = false, updatable = false)
   private Instant createdAt = Instant.now();
 
@@ -155,6 +163,22 @@ public class User {
 
   public void setLockedUntil(Instant t) {
     this.lockedUntil = t;
+  }
+
+  public boolean isMfaEnabled() {
+    return mfaEnabled;
+  }
+
+  public void setMfaEnabled(boolean mfaEnabled) {
+    this.mfaEnabled = mfaEnabled;
+  }
+
+  public Instant getPasswordChangedAt() {
+    return passwordChangedAt;
+  }
+
+  public void setPasswordChangedAt(Instant t) {
+    this.passwordChangedAt = t;
   }
 
   public Instant getCreatedAt() {

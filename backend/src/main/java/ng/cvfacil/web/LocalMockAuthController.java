@@ -100,7 +100,12 @@ public class LocalMockAuthController {
 
   private UserView view(User u) {
     return new UserView(
-        u.getId(), u.getEmail(), u.getDisplayName(), u.getRole().name(), u.getLocale());
+        u.getId(),
+        u.getEmail(),
+        u.getDisplayName(),
+        u.getRole().name(),
+        u.getLocale(),
+        u.isMfaEnabled());
   }
 
   /** Capitaliza cada palavra (ex: "joao silva" → "Joao Silva"). */

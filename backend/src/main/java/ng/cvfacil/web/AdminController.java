@@ -51,6 +51,9 @@ public class AdminController {
     if (actingUserId == null || actingRole != User.Role.ROOT_MASTER) {
       return ResponseEntity.status(403).build();
     }
+    if (!service.rootHasMfaEnabled(actingUserId)) {
+      return ResponseEntity.status(403).build();
+    }
     return service.deleteUser(actingUserId, actingRole, id)
         ? ResponseEntity.noContent().build()
         : ResponseEntity.notFound().build();
@@ -65,6 +68,9 @@ public class AdminController {
     UUID actingUserId = resolveUserId(principal);
     User.Role actingRole = roleOf(principal);
     if (actingUserId == null || actingRole != User.Role.ROOT_MASTER) {
+      return ResponseEntity.status(403).build();
+    }
+    if (!service.rootHasMfaEnabled(actingUserId)) {
       return ResponseEntity.status(403).build();
     }
     boolean ok = credits.grantByRoot(actingUserId, actingRole, id, req.amount());

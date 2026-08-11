@@ -33,7 +33,27 @@ public class AuthDtos {
               message = "Senha deve incluir maiúsculas, minúsculas, dígitos e símbolos")
           String password) {}
 
+  public record ChangePasswordRequest(
+      @NotBlank String currentPassword,
+      @NotBlank
+          @Size(min = 10, max = 256)
+          @Pattern(
+              regexp = "^(?=.*[a-z])(?=.*[A-Z])(?=.*\\d)(?=.*[^A-Za-z0-9]).+$",
+              message = "Senha deve incluir maiúsculas, minúsculas, dígitos e símbolos")
+          String newPassword) {}
+
+  public record VerifyPasswordRequest(@NotBlank String password) {}
+
+  public record MfaVerifyRequest(
+      @NotBlank String challengeToken, @NotBlank @Pattern(regexp = "\\d{6}") String code) {}
+
+  public record MfaChallengeResponse(boolean mfaRequired, String challengeToken) {}
+
   public record LoginResponse(UserView user, String accessToken) {}
 
-  public record UserView(UUID id, String email, String displayName, String role, String locale) {}
+  public record UserView(
+      UUID id, String email, String displayName, String role, String locale, boolean mfaEnabled) {}
+
+  public record SecurityStatus(
+      boolean mfaEnabled, long passwordAgeDays, boolean rotationOverdue, String role) {}
 }

@@ -27,6 +27,15 @@ public class AdminService {
     this.audit = audit;
   }
 
+  /**
+   * PRD §4.4: MFA obrigatório para o RootMaster ao exercer ações privilegiadas (excluir usuário,
+   * conceder créditos). Checado aqui — e não no login — para não travar a conta antes da primeira
+   * ativação via POST /api/mfa/setup.
+   */
+  public boolean rootHasMfaEnabled(UUID userId) {
+    return users.findById(userId).map(User::isMfaEnabled).orElse(false);
+  }
+
   public long countUsers() {
     return users.count();
   }
