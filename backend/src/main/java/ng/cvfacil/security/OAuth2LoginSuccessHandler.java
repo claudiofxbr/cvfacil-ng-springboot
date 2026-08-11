@@ -78,6 +78,18 @@ public class OAuth2LoginSuccessHandler implements AuthenticationSuccessHandler {
                   return saved;
                 });
 
+    // BUG CORRIGIDO: o orElseGet acima só marca emailVerified=true na CRIAÇÃO da conta — uma
+    // conta pré-existente (ex.: cadastrada antes por e-mail/senha, sem verificação) nunca tinha
+    // esse flag atualizado ao logar com Google depois, mesmo o Google confirmando a posse do
+    // e-mail nesse exato momento. Isso é sempre incorreto (login Google bem-sucedido = e-mail
+    // verificado, ponto), e também é o que RootEmailEnforcementService usa como sinal confiável
+    // de posse — sem este fix, uma conta protegida criada localmente antes do dono real logar
+    // com Google nunca seria promovida automaticamente.
+    if (!user.isEmailVerified()) {
+      user.setEmailVerified(true);
+      user = users.save(user);
+    }
+
     String refresh = jwt.issueRefreshToken(user.getId());
     ResponseCookie cookie =
         ResponseCookie.from("refresh_token", refresh)
