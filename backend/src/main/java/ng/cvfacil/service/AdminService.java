@@ -19,6 +19,19 @@ import org.springframework.stereotype.Service;
 @Service
 public class AdminService {
 
+  /**
+   * Regra de negocio: esta conta e ROOT_MASTER permanente (ver RootEmailEnforcementService, que
+   * corrige o papel periodicamente) e nunca pode ser excluida, mesmo por outro ROOT_MASTER.
+   */
+  public static final String PROTECTED_ROOT_EMAIL = "claudio.xavier@gmail.com";
+
+  /** Lancada quando uma acao tenta remover/rebaixar a conta Root protegida por regra de negocio. */
+  public static final class ProtectedRootAccountException extends RuntimeException {
+    public ProtectedRootAccountException(String message) {
+      super(message);
+    }
+  }
+
   private final UserRepository users;
   private final AuditService audit;
 
@@ -52,11 +65,18 @@ public class AdminService {
    *
    * @return true se excluído; false se não autorizado, alvo inexistente, ou alvo é outro
    *     ROOT_MASTER (nunca excluível por esta rota).
+   * @throws ProtectedRootAccountException se o alvo for a conta Root permanente
+   *     (PROTECTED_ROOT_EMAIL) — erro visível em vez de 404 silencioso, para que a tentativa fique
+   *     clara nos logs/resposta em vez de parecer "usuário não encontrado".
    */
   public boolean deleteUser(UUID actingUserId, User.Role actingRole, UUID targetUserId) {
     if (actingRole != User.Role.ROOT_MASTER) return false;
     User target = users.findById(targetUserId).orElse(null);
     if (target == null) return false;
+    if (PROTECTED_ROOT_EMAIL.equalsIgnoreCase(target.getEmail())) {
+      throw new ProtectedRootAccountException(
+          "Esta conta é Root permanente por regra de negócio e não pode ser excluída.");
+    }
     if (target.getRole() == User.Role.ROOT_MASTER) return false;
     users.delete(target);
     audit.record(actingUserId, "ADMIN_DELETE_USER", null, null, "target=" + targetUserId);

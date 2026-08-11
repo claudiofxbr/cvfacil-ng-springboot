@@ -52,7 +52,7 @@ public class LocalAdminController {
   }
 
   @DeleteMapping("/users/{id}")
-  public ResponseEntity<Void> deleteUser(
+  public ResponseEntity<?> deleteUser(
       @PathVariable UUID id, @AuthenticationPrincipal Jwt principal, HttpServletRequest request) {
     UUID actingUserId = resolveUserId(principal, request);
     User.Role role = roleOf(principal, request);
@@ -62,9 +62,13 @@ public class LocalAdminController {
     if (!service.rootHasMfaEnabled(actingUserId)) {
       return ResponseEntity.status(403).build();
     }
-    return service.deleteUser(actingUserId, role, id)
-        ? ResponseEntity.noContent().build()
-        : ResponseEntity.notFound().build();
+    try {
+      return service.deleteUser(actingUserId, role, id)
+          ? ResponseEntity.noContent().build()
+          : ResponseEntity.notFound().build();
+    } catch (AdminService.ProtectedRootAccountException e) {
+      return ResponseEntity.status(409).body(new AdminController.ErrorBody(e.getMessage()));
+    }
   }
 
   @PostMapping("/users/{id}/credits")

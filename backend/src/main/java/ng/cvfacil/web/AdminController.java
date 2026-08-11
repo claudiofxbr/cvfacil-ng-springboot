@@ -44,7 +44,7 @@ public class AdminController {
   }
 
   @DeleteMapping("/users/{id}")
-  public ResponseEntity<Void> deleteUser(
+  public ResponseEntity<?> deleteUser(
       @PathVariable UUID id, @AuthenticationPrincipal Jwt principal) {
     UUID actingUserId = resolveUserId(principal);
     User.Role actingRole = roleOf(principal);
@@ -54,10 +54,16 @@ public class AdminController {
     if (!service.rootHasMfaEnabled(actingUserId)) {
       return ResponseEntity.status(403).build();
     }
-    return service.deleteUser(actingUserId, actingRole, id)
-        ? ResponseEntity.noContent().build()
-        : ResponseEntity.notFound().build();
+    try {
+      return service.deleteUser(actingUserId, actingRole, id)
+          ? ResponseEntity.noContent().build()
+          : ResponseEntity.notFound().build();
+    } catch (AdminService.ProtectedRootAccountException e) {
+      return ResponseEntity.status(409).body(new ErrorBody(e.getMessage()));
+    }
   }
+
+  public record ErrorBody(String error) {}
 
   /** Concessão manual de créditos — SOMENTE Root (nunca Admin, ver PRD/RBAC). */
   @PostMapping("/users/{id}/credits")
