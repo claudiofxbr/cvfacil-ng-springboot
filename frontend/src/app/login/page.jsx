@@ -25,6 +25,11 @@ export default function LoginPage() {
   const [mockOauth, setMockOauth] = useState(false);
   const [mockEmail, setMockEmail] = useState('');
   const [mockLoading, setMockLoading] = useState(false);
+  // Segundo fator (MFA): quando login() responde 202 mfaRequired, guardamos o
+  // challengeToken de 5min e pedimos o código de 6 dígitos do app autenticador.
+  const [mfaChallenge, setMfaChallenge] = useState('');
+  const [mfaCode, setMfaCode] = useState('');
+  const [mfaLoading, setMfaLoading] = useState(false);
 
   const apiBase = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8080';
 
@@ -73,6 +78,10 @@ export default function LoginPage() {
     setLoading(true);
     try {
       const resp = await api.post('/api/auth/login', parsed.data);
+      if (resp.mfaRequired) {
+        setMfaChallenge(resp.challengeToken);
+        return;
+      }
       setSession(resp.user, resp.accessToken);
       // router.push preserva o estado Zustand (sem reload de página)
       router.push('/dashboard');
@@ -87,11 +96,32 @@ export default function LoginPage() {
         setError('Conta temporariamente bloqueada por excesso de tentativas. Aguarde 15 minutos e tente novamente.');
       } else if (err.status === 429) {
         setError('Muitas tentativas em sequência. Aguarde um momento e tente novamente.');
+      } else if (err.status === 403) {
+        setError('Acesso bloqueado para este IP. Contate o administrador do sistema.');
       } else {
         setError('E-mail ou senha incorretos. Verifique e tente novamente.');
       }
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function onMfaVerify(e) {
+    e.preventDefault();
+    setError('');
+    setMfaLoading(true);
+    try {
+      const resp = await api.post('/api/auth/mfa-verify', {
+        challengeToken: mfaChallenge,
+        code: mfaCode,
+      });
+      setSession(resp.user, resp.accessToken);
+      router.push('/dashboard');
+    } catch {
+      setError('Código inválido ou expirado. Tente novamente.');
+      setMfaCode('');
+    } finally {
+      setMfaLoading(false);
     }
   }
 
@@ -104,6 +134,52 @@ export default function LoginPage() {
             <h1 className="mb-1 text-center font-display text-2xl font-bold text-gray-900">
               Entrar no CVFacil.NG
             </h1>
+
+            {mfaChallenge ? (
+              <>
+                <p className="mb-8 text-center text-sm text-gray-500">
+                  Digite o código de 6 dígitos do seu aplicativo autenticador.
+                </p>
+                <form onSubmit={onMfaVerify} className="space-y-4" noValidate>
+                  <div>
+                    <label htmlFor="mfaCode" className="mb-1 block text-sm font-medium text-gray-700">
+                      Código de verificação
+                    </label>
+                    <input
+                      id="mfaCode"
+                      inputMode="numeric"
+                      pattern="\d{6}"
+                      maxLength={6}
+                      autoFocus
+                      required
+                      value={mfaCode}
+                      onChange={(e) => setMfaCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                      className="w-full rounded-md border border-gray-300 px-3 py-2 text-center text-lg tracking-[0.5em] focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500"
+                    />
+                  </div>
+                  {error && (
+                    <div role="alert" className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">
+                      {error}
+                    </div>
+                  )}
+                  <button
+                    type="submit"
+                    disabled={mfaLoading || mfaCode.length !== 6}
+                    className="btn-primary w-full py-3 disabled:opacity-60"
+                  >
+                    {mfaLoading ? 'Verificando...' : 'Verificar'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => { setMfaChallenge(''); setMfaCode(''); setError(''); }}
+                    className="w-full text-center text-sm text-gray-500 hover:underline"
+                  >
+                    Voltar
+                  </button>
+                </form>
+              </>
+            ) : (
+              <>
             <p className="mb-8 text-center text-sm text-gray-500">
               Use sua conta Google ou seu e-mail e senha.
             </p>
@@ -206,6 +282,8 @@ export default function LoginPage() {
                 </Link>
               </div>
             </form>
+              </>
+            )}
           </div>
         </FadeIn>
       </main>

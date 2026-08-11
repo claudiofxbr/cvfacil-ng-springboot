@@ -4,7 +4,6 @@ import { useState, useEffect, useRef, useCallback, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { ChevronLeft, Plus, Trash2, Printer, Camera, Save, LayoutDashboard, Moon, FileDown, X } from 'lucide-react';
-import { Header } from '@/components/ui/Header';
 import { ResumeLayout, getLayout } from '@/components/layouts';
 import { useAuthStore } from '@/lib/stores/authStore';
 import { useResumeImportStore } from '@/lib/stores/resumeImportStore';
@@ -488,6 +487,7 @@ function EditorContent() {
   const [savedId,       setSavedId]       = useState(resumeId);
   const [saveStatus,    setSaveStatus]    = useState('idle'); // 'idle' | 'saving' | 'saved'
   const [showAfterPrint, setShowAfterPrint] = useState(false);
+  const [creditsError,  setCreditsError]  = useState(false);
 
   // Redireciona se nao autenticado
   useEffect(() => {
@@ -503,7 +503,13 @@ function EditorContent() {
   useEffect(() => {
     if (resumeId) {
       const saved = getResume(resumeId);
-      if (saved) { setData(saved.data); setSavedId(resumeId); }
+      if (saved) {
+        setData(saved.data);
+        setSavedId(resumeId);
+        // A cor salva junto do currículo (data.paletteId) prevalece sobre a URL,
+        // já que o dashboard não propaga ?palette= ao abrir um currículo existente.
+        if (saved.data.paletteId !== undefined) setPaletteId(saved.data.paletteId);
+      }
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [resumeId]);
@@ -528,9 +534,24 @@ function EditorContent() {
   // ── Salvar: persiste no store + exporta PDF ───────────────────────────────────
   // Correcao: o botao Salvar agora tambem abre o dialogo de impressao para
   // exportacao em PDF, conforme solicitado pelo usuario.
-  function handleSave() {
-    // 1. Persistir no store (localStorage)
-    const id = saveResume({ id: savedId, layoutId, data });
+  async function handleSave() {
+    setCreditsError(false);
+    // 1. Persistir no store (localStorage) — a cor escolhida vai dentro de `data`
+    // para sobreviver ao reload/reabertura do currículo (a URL sozinha não basta).
+    // CORRECAO: saveResume é assíncrona (sincroniza com o backend) — sem o await,
+    // `id` era a própria Promise, não o id real, e o erro 402 (sem créditos) era
+    // engolido silenciosamente: o usuário perdia o trabalho sem nenhum aviso.
+    const dataToSave = { ...data, paletteId };
+    let id;
+    try {
+      id = await saveResume({ id: savedId, layoutId, data: dataToSave });
+    } catch (e) {
+      if (e.status === 402) {
+        setCreditsError(true);
+        return;
+      }
+      throw e;
+    }
     setSavedId(id);
     setSaveStatus('saved');
 
@@ -557,8 +578,6 @@ function EditorContent() {
 
   return (
     <>
-      <Header />
-
       {/* ── Modal pos-impressao (aparece quando o dialogo de print fecha) ── */}
       {showAfterPrint && (
         <AfterPrintModal
@@ -576,7 +595,7 @@ function EditorContent() {
         porque o PostCSS as injeta com especificidade alta; usamos classes semanticas
         extras que o globals.css consegue sobrescrever com !important.
       */}
-      <div className="editor-shell flex h-[calc(100vh-64px)] overflow-hidden">
+      <div className="editor-shell flex h-screen overflow-hidden">
 
         {/* ── Painel do formulario ── */}
         <aside className="flex w-[546px] shrink-0 flex-col border-r border-gray-200 bg-white">
@@ -625,6 +644,16 @@ function EditorContent() {
               </button>
             </div>
           </div>
+
+          {/* Aviso: sem créditos disponíveis para criar/salvar o currículo */}
+          {creditsError && (
+            <div className="flex items-center justify-between gap-2 border-b border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800 print:hidden" data-print-hidden>
+              <span>Você não tem créditos suficientes. O currículo ficou salvo só neste dispositivo.</span>
+              <Link href="/dashboard/credits" className="shrink-0 font-semibold underline hover:no-underline">
+                Comprar créditos
+              </Link>
+            </div>
+          )}
 
           {/* Seletor de temas escuros */}
           <div className="flex items-center gap-2 border-b border-gray-200 bg-gray-50 px-3 py-1.5 print:hidden" data-print-hidden>

@@ -5,7 +5,6 @@ import { useRouter } from 'next/navigation';
 import { Search, Star, Upload, FileText, CheckCircle2, AlertCircle, Edit2, Trash2, Printer, Moon, Sparkles, Loader2 } from 'lucide-react';
 import { extractTextFromFile, parseResumeText } from '@/lib/parseResumeText';
 import { useResumeImportStore } from '@/lib/stores/resumeImportStore';
-import { Header } from '@/components/ui/Header';
 import { FadeIn, Stagger, StaggerItem } from '@/components/ui/Motion';
 import { LAYOUTS, ResumeLayout } from '@/components/layouts';
 import { PhotoPicker } from '@/components/photo/PhotoPicker';
@@ -66,9 +65,7 @@ export default function DashboardPage() {
   }, [query, paletteFilter, sort]);
 
   return (
-    <>
-      <Header />
-      <main className="container-page py-8">
+    <main className="container-page py-8">
         <FadeIn>
           <h1 className="mb-2 font-display text-3xl font-bold text-gray-900">Meu painel</h1>
           <p className="mb-6 text-gray-600">Escolha um modelo, personalize a foto e gere seu currículo.</p>
@@ -174,8 +171,7 @@ export default function DashboardPage() {
         )}
 
         {tab === 'aiImport' && <ImportTab router={router} />}
-      </main>
-    </>
+    </main>
   );
 }
 
@@ -462,7 +458,11 @@ function ImportTab({ router }) {
   const [fileObj,     setFileObj]     = useState(null);
   const [rawText,     setRawText]     = useState('');
   const [errorMsg,    setErrorMsg]    = useState('');
-  const [layoutId,    setLayoutId]    = useState('navyClassic');
+  // Default = 'onyxExecutive' (variante 'minimal', sem <header>/<aside> coloridos)
+  // — evita o layout cair em navyClassic/crimsonImpact/forestPro/magentaVivid/
+  // roseBold/lilacSoft, cujas variantes header/band/split tem cabecalho invisivel
+  // quando o preview herda [data-theme] header/aside do app-shell (ver globals.css).
+  const [layoutId,    setLayoutId]    = useState('onyxExecutive');
   const [usedAI,      setUsedAI]      = useState(false);
   // aiFailReason: null | 'no-key' | 'offline' | 'auth' | 'server' | 'unknown'
   const [aiFailReason, setAiFailReason] = useState(null);

@@ -7,6 +7,7 @@ import { useAuthStore } from '@/lib/stores/authStore';
 import { useThemeStore } from '@/lib/stores/themeStore';
 import { useLocaleStore } from '@/lib/stores/localeStore';
 import { ThemeSwitcher } from '@/components/ui/ThemeSwitcher';
+import { IdleTimeoutGuard } from '@/components/ui/IdleTimeoutGuard';
 import { api } from '@/lib/apiClient';
 import ptBR from '@/locales/pt-BR/common.json';
 import enUS from '@/locales/en-US/common.json';
@@ -97,6 +98,7 @@ export function Providers({ children }) {
         {children}
         {/* ThemeSwitcher é global — aparece em todas as páginas */}
         <ThemeSwitcher />
+        <IdleTimeoutGuard />
       </QueryClientProvider>
     </NextIntlClientProvider>
   );
