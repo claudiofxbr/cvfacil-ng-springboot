@@ -10,6 +10,7 @@ import ng.cvfacil.dto.AuthDtos.UserView;
 import ng.cvfacil.repository.UserRepository;
 import ng.cvfacil.security.JwtService;
 import ng.cvfacil.service.AuditService;
+import ng.cvfacil.service.CreditService;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Profile;
 import org.springframework.http.ResponseCookie;
@@ -39,14 +40,17 @@ public class LocalMockAuthController {
     private final UserRepository users;
     private final JwtService jwt;
     private final AuditService audit;
+    private final CreditService credits;
 
     @Value("${cvfacil.security.cookie-secure:true}")
     private boolean cookieSecure;
 
-    public LocalMockAuthController(UserRepository users, JwtService jwt, AuditService audit) {
+    public LocalMockAuthController(
+            UserRepository users, JwtService jwt, AuditService audit, CreditService credits) {
         this.users = users;
         this.jwt = jwt;
         this.audit = audit;
+        this.credits = credits;
     }
 
     public record MockGoogleRequest(@Email @NotBlank String email) {}
@@ -65,7 +69,9 @@ public class LocalMockAuthController {
             newUser.setDisplayName(capitalize(name));
             newUser.setLocale("pt-BR");
             // Sem passwordHash — conta somente-OAuth
-            return users.save(newUser);
+            User saved = users.save(newUser);
+            credits.grantCourtesyIfEligible(saved.getId());
+            return saved;
         });
 
         String access  = jwt.issueAccessToken(u);

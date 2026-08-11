@@ -6,6 +6,7 @@ import java.util.List;
 import java.util.UUID;
 import ng.cvfacil.dto.ResumeDtos.ResumeRequest;
 import ng.cvfacil.dto.ResumeDtos.ResumeView;
+import ng.cvfacil.service.CreditService;
 import ng.cvfacil.service.ResumeService;
 import org.springframework.context.annotation.Primary;
 import org.springframework.context.annotation.Profile;
@@ -60,7 +61,11 @@ public class LocalResumeController {
       HttpServletRequest request) {
     UUID userId = resolveUserId(principal, request);
     if (userId == null) return ResponseEntity.status(401).build();
-    return ResponseEntity.status(201).body(service.create(userId, req));
+    try {
+      return ResponseEntity.status(201).body(service.create(userId, req));
+    } catch (CreditService.InsufficientCreditsException e) {
+      return ResponseEntity.status(402).build(); // Payment Required — sem créditos
+    }
   }
 
   @PutMapping("/{id}")

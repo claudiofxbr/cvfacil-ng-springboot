@@ -15,6 +15,7 @@ import ng.cvfacil.dto.AuthDtos.UserView;
 import ng.cvfacil.repository.UserRepository;
 import ng.cvfacil.security.JwtService;
 import ng.cvfacil.service.AuditService;
+import ng.cvfacil.service.CreditService;
 import ng.cvfacil.service.PasswordResetService;
 import ng.cvfacil.service.RateLimitService;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -37,6 +38,7 @@ public class AuthController {
   private final AuditService audit;
   private final RateLimitService rateLimit;
   private final PasswordResetService passwordReset;
+  private final CreditService credits;
 
   /**
    * JwtDecoder apenas disponível no profile "!local" (SecurityConfig).
@@ -55,13 +57,15 @@ public class AuthController {
       JwtService jwt,
       AuditService audit,
       RateLimitService rateLimit,
-      PasswordResetService passwordReset) {
+      PasswordResetService passwordReset,
+      CreditService credits) {
     this.users = users;
     this.encoder = encoder;
     this.jwt = jwt;
     this.audit = audit;
     this.rateLimit = rateLimit;
     this.passwordReset = passwordReset;
+    this.credits = credits;
   }
 
   @PostMapping("/register")
@@ -77,6 +81,8 @@ public class AuthController {
     if (req.locale() != null) u.setLocale(req.locale());
     users.save(u);
     audit.record(u.getId(), "USER_REGISTER", http.getRemoteAddr(), http.getHeader("User-Agent"), null);
+    // Cortesia: 1 crédito grátis de criação de currículo por conta nova.
+    credits.grantCourtesyIfEligible(u.getId());
     return ResponseEntity.ok(view(u));
   }
 

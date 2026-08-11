@@ -9,6 +9,7 @@ import ng.cvfacil.dto.ResumeDtos.ResumeRequest;
 import ng.cvfacil.dto.ResumeDtos.ResumeView;
 import ng.cvfacil.repository.ResumeRepository;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Lógica de CRUD de currículos compartilhada entre ResumeController (produção)
@@ -26,10 +27,12 @@ public class ResumeService {
 
   private final ResumeRepository resumes;
   private final AesGcmCipherService cipher;
+  private final CreditService credits;
 
-  public ResumeService(ResumeRepository resumes, AesGcmCipherService cipher) {
+  public ResumeService(ResumeRepository resumes, AesGcmCipherService cipher, CreditService credits) {
     this.resumes = resumes;
     this.cipher = cipher;
+    this.credits = credits;
   }
 
   public List<ResumeView> list(UUID userId) {
@@ -40,7 +43,14 @@ public class ResumeService {
     return resumes.findById(id).filter(r -> r.getUserId().equals(userId)).map(this::toView);
   }
 
+  /**
+   * @throws CreditService.InsufficientCreditsException se o usuário não tiver
+   *         crédito disponível — 1 crédito é consumido por currículo criado
+   *         (não se aplica a edição, só à criação).
+   */
+  @Transactional
   public ResumeView create(UUID userId, ResumeRequest req) {
+    credits.consumeOneForResumeCreation(userId);
     Resume r = new Resume();
     r.setUserId(userId);
     applyRequest(r, req);

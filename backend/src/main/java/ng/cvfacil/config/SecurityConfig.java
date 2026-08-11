@@ -20,6 +20,8 @@ import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.security.oauth2.jwt.NimbusJwtDecoder;
+import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationConverter;
+import org.springframework.security.oauth2.server.resource.authentication.JwtGrantedAuthoritiesConverter;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.csrf.CookieCsrfTokenRepository;
 import org.springframework.security.web.csrf.CsrfTokenRequestAttributeHandler;
@@ -111,6 +113,24 @@ public class SecurityConfig {
     }
   }
 
+  /**
+   * BUG ENCONTRADO E CORRIGIDO: sem este bean, o Spring Security usa o
+   * conversor default de authorities, que lê o claim "scope"/"scp" — mas
+   * JwtService assina tokens com um claim "role" (USER/ADMIN/ROOT_MASTER),
+   * não "scope". Resultado: toda authority ficava vazia e
+   * .hasAuthority("ROLE_ROOT_MASTER") nunca era concedida a ninguém, mesmo
+   * para o ROOT_MASTER legítimo — /api/admin/** ficava inacessível na prática.
+   */
+  @Bean
+  public JwtAuthenticationConverter jwtAuthenticationConverter() {
+    JwtGrantedAuthoritiesConverter authorities = new JwtGrantedAuthoritiesConverter();
+    authorities.setAuthoritiesClaimName("role");
+    authorities.setAuthorityPrefix("ROLE_");
+    JwtAuthenticationConverter converter = new JwtAuthenticationConverter();
+    converter.setJwtGrantedAuthoritiesConverter(authorities);
+    return converter;
+  }
+
   @Bean
   public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
     CsrfTokenRequestAttributeHandler csrfHandler = new CsrfTokenRequestAttributeHandler();
@@ -142,11 +162,15 @@ public class SecurityConfig {
             auth ->
                 auth.requestMatchers(HttpMethod.GET, "/actuator/health").permitAll()
                     .requestMatchers("/api/auth/**", "/oauth2/**", "/login/oauth2/**").permitAll()
-                    .requestMatchers("/api/admin/**").hasAuthority("ROLE_ROOT_MASTER")
+                    // Root e Admin entram no /api/admin/**; as ações restritas ao Root
+                    // (excluir usuário, conceder créditos) são checadas dentro do
+                    // controller — ver AdminController/AdminService.
+                    .requestMatchers("/api/admin/**")
+                        .hasAnyAuthority("ROLE_ADMIN", "ROLE_ROOT_MASTER")
                     .anyRequest().authenticated())
         .oauth2Login(oauth -> {})
-        // JwtDecoder bean declarado acima é injetado automaticamente pelo Spring Security
-        .oauth2ResourceServer(rs -> rs.jwt(jwt -> {}));
+        .oauth2ResourceServer(
+            rs -> rs.jwt(jwt -> jwt.jwtAuthenticationConverter(jwtAuthenticationConverter())));
 
     return http.build();
   }

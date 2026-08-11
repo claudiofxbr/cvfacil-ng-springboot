@@ -59,6 +59,10 @@ class ResumeControllerIntegrationTest {
     testUser.setEmail("resume-test@cvfacil.ng");
     testUser.setPasswordHash(encoder.encode("Senha@Forte123"));
     testUser.setDisplayName("Resume Tester");
+    // Criação de currículo agora consome 1 crédito (CreditService) — o fluxo real
+    // de registro concede a cortesia, mas este teste cria o usuário direto no
+    // repositório, então precisa de saldo explícito para os cenários de criação.
+    testUser.setCredits(10);
     users.save(testUser);
 
     // Gera STUB token para autenticação nos testes
@@ -117,6 +121,7 @@ class ResumeControllerIntegrationTest {
     other.setEmail("other@cvfacil.ng");
     other.setPasswordHash(encoder.encode("Senha@Forte123"));
     other.setDisplayName("Other");
+    other.setCredits(10);
     users.save(other);
     String otherToken = jwtService.issueAccessToken(other);
     try {
@@ -177,6 +182,7 @@ class ResumeControllerIntegrationTest {
     other.setEmail("other2@cvfacil.ng");
     other.setPasswordHash(encoder.encode("Senha@Forte123"));
     other.setDisplayName("Other2");
+    other.setCredits(10);
     users.save(other);
     String otherToken = jwtService.issueAccessToken(other);
     try {

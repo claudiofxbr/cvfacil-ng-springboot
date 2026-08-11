@@ -9,7 +9,13 @@ import ng.cvfacil.domain.convert.MfaSecretConverter;
 @Table(name = "users")
 public class User {
 
-  public enum Role { USER, ROOT_MASTER }
+  /**
+   * USER (Cliente): CRUD e impressão dos próprios currículos.
+   * ADMIN: todas as prerrogativas de ROOT_MASTER, exceto excluir usuários e
+   *        conceder créditos manualmente — ver AdminService/AdminController.
+   * ROOT_MASTER (Root): controle total, incluindo excluir usuários e créditos.
+   */
+  public enum Role { USER, ADMIN, ROOT_MASTER }
 
   @Id
   @GeneratedValue(strategy = GenerationType.UUID)
@@ -40,6 +46,10 @@ public class User {
   @Convert(converter = MfaSecretConverter.class)
   @Column(name = "mfa_secret", length = 255)
   private String mfaSecret;
+
+  /** Saldo de créditos de criação de currículo (1 crédito = 1 currículo). */
+  @Column(nullable = false)
+  private int credits;
 
   @Column(name = "failed_logins", nullable = false)
   private int failedLogins;
@@ -72,6 +82,8 @@ public class User {
   public void setEmailVerified(boolean v) { this.emailVerified = v; }
   public String getMfaSecret() { return mfaSecret; }
   public void setMfaSecret(String s) { this.mfaSecret = s; }
+  public int getCredits() { return credits; }
+  public void setCredits(int credits) { this.credits = credits; }
   public int getFailedLogins() { return failedLogins; }
   public void setFailedLogins(int n) { this.failedLogins = n; }
   public Instant getLockedUntil() { return lockedUntil; }

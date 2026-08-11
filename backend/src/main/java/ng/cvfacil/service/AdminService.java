@@ -1,0 +1,66 @@
+package ng.cvfacil.service;
+
+import java.time.Instant;
+import java.util.List;
+import java.util.UUID;
+import ng.cvfacil.domain.User;
+import ng.cvfacil.repository.UserRepository;
+import org.springframework.stereotype.Service;
+
+/**
+ * Regras de RBAC compartilhadas entre AdminController (produção) e
+ * LocalAdminController (dev local) — mesmo padrão de dedup usado em
+ * ResumeService/AIImportRequestSupport: a lógica sensível a segurança vive
+ * em um único lugar.
+ *
+ * Papéis (ver User.Role):
+ *   USER (Cliente): fora do escopo deste serviço — só mexe nos próprios currículos.
+ *   ADMIN: tudo abaixo, EXCETO excluir usuário e conceder créditos.
+ *   ROOT_MASTER (Root): tudo, sem exceção.
+ */
+@Service
+public class AdminService {
+
+  private final UserRepository users;
+  private final AuditService audit;
+
+  public AdminService(UserRepository users, AuditService audit) {
+    this.users = users;
+    this.audit = audit;
+  }
+
+  public long countUsers() {
+    return users.count();
+  }
+
+  /** Disponível para ADMIN e ROOT_MASTER — checagem de papel fica no controller. */
+  public List<UserAdminView> listUsers() {
+    return users.findAll().stream().map(this::toView).toList();
+  }
+
+  /**
+   * Exclusão de usuário — SOMENTE ROOT_MASTER. O controller deve garantir que
+   * {@code actingRole == Role.ROOT_MASTER} antes de chamar este método; aqui
+   * repetimos a checagem como segunda barreira (defense in depth).
+   *
+   * @return true se excluído; false se não autorizado, alvo inexistente, ou
+   *         alvo é outro ROOT_MASTER (nunca excluível por esta rota).
+   */
+  public boolean deleteUser(UUID actingUserId, User.Role actingRole, UUID targetUserId) {
+    if (actingRole != User.Role.ROOT_MASTER) return false;
+    User target = users.findById(targetUserId).orElse(null);
+    if (target == null) return false;
+    if (target.getRole() == User.Role.ROOT_MASTER) return false;
+    users.delete(target);
+    audit.record(actingUserId, "ADMIN_DELETE_USER", null, null, "target=" + targetUserId);
+    return true;
+  }
+
+  private UserAdminView toView(User u) {
+    return new UserAdminView(
+        u.getId(), u.getEmail(), u.getDisplayName(), u.getRole().name(), u.getCreatedAt());
+  }
+
+  public record UserAdminView(
+      UUID id, String email, String displayName, String role, Instant createdAt) {}
+}
