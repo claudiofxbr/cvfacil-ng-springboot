@@ -10,12 +10,16 @@ import ng.cvfacil.domain.convert.MfaSecretConverter;
 public class User {
 
   /**
-   * USER (Cliente): CRUD e impressão dos próprios currículos.
-   * ADMIN: todas as prerrogativas de ROOT_MASTER, exceto excluir usuários e
-   *        conceder créditos manualmente — ver AdminService/AdminController.
-   * ROOT_MASTER (Root): controle total, incluindo excluir usuários e créditos.
+   * USER (Cliente): CRUD e impressão dos próprios currículos. ADMIN: todas as prerrogativas de
+   * ROOT_MASTER, exceto excluir usuários e conceder créditos manualmente — ver
+   * AdminService/AdminController. ROOT_MASTER (Root): controle total, incluindo excluir usuários e
+   * créditos.
    */
-  public enum Role { USER, ADMIN, ROOT_MASTER }
+  public enum Role {
+    USER,
+    ADMIN,
+    ROOT_MASTER
+  }
 
   @Id
   @GeneratedValue(strategy = GenerationType.UUID)
@@ -64,30 +68,100 @@ public class User {
   private Instant updatedAt = Instant.now();
 
   @PreUpdate
-  void onUpdate() { this.updatedAt = Instant.now(); }
+  void onUpdate() {
+    this.updatedAt = Instant.now();
+  }
 
   // ---- Getters / Setters ----
-  public UUID getId() { return id; }
-  public String getEmail() { return email; }
-  public void setEmail(String email) { this.email = email; }
-  public String getPasswordHash() { return passwordHash; }
-  public void setPasswordHash(String passwordHash) { this.passwordHash = passwordHash; }
-  public String getDisplayName() { return displayName; }
-  public void setDisplayName(String n) { this.displayName = n; }
-  public String getLocale() { return locale; }
-  public void setLocale(String l) { this.locale = l; }
-  public Role getRole() { return role; }
-  public void setRole(Role r) { this.role = r; }
-  public boolean isEmailVerified() { return emailVerified; }
-  public void setEmailVerified(boolean v) { this.emailVerified = v; }
-  public String getMfaSecret() { return mfaSecret; }
-  public void setMfaSecret(String s) { this.mfaSecret = s; }
-  public int getCredits() { return credits; }
-  public void setCredits(int credits) { this.credits = credits; }
-  public int getFailedLogins() { return failedLogins; }
-  public void setFailedLogins(int n) { this.failedLogins = n; }
-  public Instant getLockedUntil() { return lockedUntil; }
-  public void setLockedUntil(Instant t) { this.lockedUntil = t; }
-  public Instant getCreatedAt() { return createdAt; }
-  public Instant getUpdatedAt() { return updatedAt; }
+  public UUID getId() {
+    return id;
+  }
+
+  public String getEmail() {
+    return email;
+  }
+
+  public void setEmail(String email) {
+    this.email = email;
+  }
+
+  public String getPasswordHash() {
+    return passwordHash;
+  }
+
+  public void setPasswordHash(String passwordHash) {
+    this.passwordHash = passwordHash;
+  }
+
+  public String getDisplayName() {
+    return displayName;
+  }
+
+  public void setDisplayName(String n) {
+    this.displayName = n;
+  }
+
+  public String getLocale() {
+    return locale;
+  }
+
+  public void setLocale(String l) {
+    this.locale = l;
+  }
+
+  public Role getRole() {
+    return role;
+  }
+
+  public void setRole(Role r) {
+    this.role = r;
+  }
+
+  public boolean isEmailVerified() {
+    return emailVerified;
+  }
+
+  public void setEmailVerified(boolean v) {
+    this.emailVerified = v;
+  }
+
+  public String getMfaSecret() {
+    return mfaSecret;
+  }
+
+  public void setMfaSecret(String s) {
+    this.mfaSecret = s;
+  }
+
+  public int getCredits() {
+    return credits;
+  }
+
+  public void setCredits(int credits) {
+    this.credits = credits;
+  }
+
+  public int getFailedLogins() {
+    return failedLogins;
+  }
+
+  public void setFailedLogins(int n) {
+    this.failedLogins = n;
+  }
+
+  public Instant getLockedUntil() {
+    return lockedUntil;
+  }
+
+  public void setLockedUntil(Instant t) {
+    this.lockedUntil = t;
+  }
+
+  public Instant getCreatedAt() {
+    return createdAt;
+  }
+
+  public Instant getUpdatedAt() {
+    return updatedAt;
+  }
 }

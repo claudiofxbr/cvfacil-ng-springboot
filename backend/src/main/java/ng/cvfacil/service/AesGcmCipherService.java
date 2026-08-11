@@ -8,8 +8,8 @@ import javax.crypto.spec.GCMParameterSpec;
 import org.springframework.stereotype.Service;
 
 /**
- * AES-256-GCM com IV aleatório por operação (12 bytes).
- * Layout do ciphertext: [IV(12) || TAG+CIPHERTEXT]
+ * AES-256-GCM com IV aleatório por operação (12 bytes). Layout do ciphertext: [IV(12) ||
+ * TAG+CIPHERTEXT]
  */
 @Service
 public class AesGcmCipherService {

@@ -21,7 +21,6 @@ import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMock
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.data.redis.core.StringRedisTemplate;
-import org.springframework.data.redis.core.script.RedisScript;
 import org.springframework.http.MediaType;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.context.ActiveProfiles;
@@ -31,8 +30,8 @@ import org.springframework.test.web.servlet.MvcResult;
 /**
  * Testes de integração para LocalResumeController (perfil "local").
  *
- * <p>Cria um usuário real no EmbeddedPostgres, autentica via /api/auth/login
- * para obter um STUB token e testa o CRUD completo de currículos.
+ * <p>Cria um usuário real no EmbeddedPostgres, autentica via /api/auth/login para obter um STUB
+ * token e testa o CRUD completo de currículos.
  */
 @SpringBootTest
 @AutoConfigureMockMvc
@@ -46,8 +45,7 @@ class ResumeControllerIntegrationTest {
   @Autowired PasswordEncoder encoder;
   @Autowired JwtService jwtService;
 
-  @MockBean
-  StringRedisTemplate redis;
+  @MockBean StringRedisTemplate redis;
 
   private User testUser;
   private String stubToken;
@@ -80,12 +78,14 @@ class ResumeControllerIntegrationTest {
 
   @Test
   void createResume_withValidData_returns201() throws Exception {
-    var req = resumeRequest("classic", "{\"fullName\":\"João Silva\",\"email\":\"joao@example.com\"}");
+    var req =
+        resumeRequest("classic", "{\"fullName\":\"João Silva\",\"email\":\"joao@example.com\"}");
 
-    mvc.perform(post("/api/resumes")
-            .header("Authorization", "Bearer " + stubToken)
-            .contentType(MediaType.APPLICATION_JSON)
-            .content(mapper.writeValueAsString(req)))
+    mvc.perform(
+            post("/api/resumes")
+                .header("Authorization", "Bearer " + stubToken)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(mapper.writeValueAsString(req)))
         .andExpect(status().isCreated())
         .andExpect(jsonPath("$.id").isNotEmpty())
         .andExpect(jsonPath("$.layoutId").value("classic"))
@@ -95,9 +95,10 @@ class ResumeControllerIntegrationTest {
   @Test
   void createResume_withoutAuth_returns401() throws Exception {
     var req = resumeRequest("classic", "{\"fullName\":\"João\"}");
-    mvc.perform(post("/api/resumes")
-            .contentType(MediaType.APPLICATION_JSON)
-            .content(mapper.writeValueAsString(req)))
+    mvc.perform(
+            post("/api/resumes")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(mapper.writeValueAsString(req)))
         .andExpect(status().isUnauthorized());
   }
 
@@ -108,8 +109,7 @@ class ResumeControllerIntegrationTest {
     createResumeViaApi(stubToken, "classic", "{\"fullName\":\"Teste 1\"}");
     createResumeViaApi(stubToken, "modern", "{\"fullName\":\"Teste 2\"}");
 
-    mvc.perform(get("/api/resumes")
-            .header("Authorization", "Bearer " + stubToken))
+    mvc.perform(get("/api/resumes").header("Authorization", "Bearer " + stubToken))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.length()").value(2));
   }
@@ -128,8 +128,7 @@ class ResumeControllerIntegrationTest {
       createResumeViaApi(otherToken, "classic", "{\"fullName\":\"Outro\"}");
 
       // O usuário principal não deve ver currículo do outro
-      mvc.perform(get("/api/resumes")
-              .header("Authorization", "Bearer " + stubToken))
+      mvc.perform(get("/api/resumes").header("Authorization", "Bearer " + stubToken))
           .andExpect(status().isOk())
           .andExpect(jsonPath("$.length()").value(0));
     } finally {
@@ -145,8 +144,7 @@ class ResumeControllerIntegrationTest {
     String content = "{\"fullName\":\"Decifrado\"}";
     UUID id = createResumeViaApi(stubToken, "modern", content);
 
-    mvc.perform(get("/api/resumes/" + id)
-            .header("Authorization", "Bearer " + stubToken))
+    mvc.perform(get("/api/resumes/" + id).header("Authorization", "Bearer " + stubToken))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.id").value(id.toString()))
         .andExpect(jsonPath("$.content").value(content));
@@ -154,8 +152,8 @@ class ResumeControllerIntegrationTest {
 
   @Test
   void getResume_nonExistentId_returns404() throws Exception {
-    mvc.perform(get("/api/resumes/" + UUID.randomUUID())
-            .header("Authorization", "Bearer " + stubToken))
+    mvc.perform(
+            get("/api/resumes/" + UUID.randomUUID()).header("Authorization", "Bearer " + stubToken))
         .andExpect(status().isNotFound());
   }
 
@@ -166,14 +164,16 @@ class ResumeControllerIntegrationTest {
     UUID id = createResumeViaApi(stubToken, "classic", "{\"fullName\":\"Original\"}");
 
     var update = resumeRequest("modern", "{\"fullName\":\"Atualizado\"}");
-    MvcResult result = mvc.perform(put("/api/resumes/" + id)
-            .header("Authorization", "Bearer " + stubToken)
-            .contentType(MediaType.APPLICATION_JSON)
-            .content(mapper.writeValueAsString(update)))
-        .andExpect(status().isOk())
-        .andExpect(jsonPath("$.version").value(2))
-        .andExpect(jsonPath("$.content").value(update.get("content")))
-        .andReturn();
+    MvcResult result =
+        mvc.perform(
+                put("/api/resumes/" + id)
+                    .header("Authorization", "Bearer " + stubToken)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(mapper.writeValueAsString(update)))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.version").value(2))
+            .andExpect(jsonPath("$.content").value(update.get("content")))
+            .andReturn();
   }
 
   @Test
@@ -190,10 +190,11 @@ class ResumeControllerIntegrationTest {
 
       // Usuário principal não deve conseguir editar currículo de outro
       var update = resumeRequest("modern", "{\"fullName\":\"Hack\"}");
-      mvc.perform(put("/api/resumes/" + otherId)
-              .header("Authorization", "Bearer " + stubToken)
-              .contentType(MediaType.APPLICATION_JSON)
-              .content(mapper.writeValueAsString(update)))
+      mvc.perform(
+              put("/api/resumes/" + otherId)
+                  .header("Authorization", "Bearer " + stubToken)
+                  .contentType(MediaType.APPLICATION_JSON)
+                  .content(mapper.writeValueAsString(update)))
           .andExpect(status().isNotFound());
     } finally {
       resumes.deleteAll(resumes.findByUserIdOrderByUpdatedAtDesc(other.getId()));
@@ -207,8 +208,7 @@ class ResumeControllerIntegrationTest {
   void deleteResume_existingId_returns204() throws Exception {
     UUID id = createResumeViaApi(stubToken, "classic", "{\"fullName\":\"Deletar\"}");
 
-    mvc.perform(delete("/api/resumes/" + id)
-            .header("Authorization", "Bearer " + stubToken))
+    mvc.perform(delete("/api/resumes/" + id).header("Authorization", "Bearer " + stubToken))
         .andExpect(status().isNoContent());
 
     // Confirma que foi removido
@@ -217,8 +217,9 @@ class ResumeControllerIntegrationTest {
 
   @Test
   void deleteResume_nonExistentId_returns404() throws Exception {
-    mvc.perform(delete("/api/resumes/" + UUID.randomUUID())
-            .header("Authorization", "Bearer " + stubToken))
+    mvc.perform(
+            delete("/api/resumes/" + UUID.randomUUID())
+                .header("Authorization", "Bearer " + stubToken))
         .andExpect(status().isNotFound());
   }
 
@@ -233,12 +234,14 @@ class ResumeControllerIntegrationTest {
 
   private UUID createResumeViaApi(String token, String layoutId, String content) throws Exception {
     var req = resumeRequest(layoutId, content);
-    MvcResult result = mvc.perform(post("/api/resumes")
-            .header("Authorization", "Bearer " + token)
-            .contentType(MediaType.APPLICATION_JSON)
-            .content(mapper.writeValueAsString(req)))
-        .andExpect(status().isCreated())
-        .andReturn();
+    MvcResult result =
+        mvc.perform(
+                post("/api/resumes")
+                    .header("Authorization", "Bearer " + token)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(mapper.writeValueAsString(req)))
+            .andExpect(status().isCreated())
+            .andReturn();
 
     var body = mapper.readTree(result.getResponse().getContentAsString());
     return UUID.fromString(body.get("id").asText());

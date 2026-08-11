@@ -12,15 +12,14 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Lógica de CRUD de currículos compartilhada entre ResumeController (produção)
- * e LocalResumeController (dev local).
+ * Lógica de CRUD de currículos compartilhada entre ResumeController (produção) e
+ * LocalResumeController (dev local).
  *
- * ANTES: os dois controllers duplicavam integralmente esta lógica (cifragem,
- * filtro de propriedade por userId, mapeamento de view). Isso é justamente o
- * código sensível a segurança — uma correção aplicada em um controller e
- * esquecida no outro teria criado uma divergência silenciosa entre profiles.
- * Agora existe uma única implementação; os controllers só resolvem o userId
- * (a única coisa que difere entre profiles) e delegam para cá.
+ * <p>ANTES: os dois controllers duplicavam integralmente esta lógica (cifragem, filtro de
+ * propriedade por userId, mapeamento de view). Isso é justamente o código sensível a segurança —
+ * uma correção aplicada em um controller e esquecida no outro teria criado uma divergência
+ * silenciosa entre profiles. Agora existe uma única implementação; os controllers só resolvem o
+ * userId (a única coisa que difere entre profiles) e delegam para cá.
  */
 @Service
 public class ResumeService {
@@ -29,7 +28,8 @@ public class ResumeService {
   private final AesGcmCipherService cipher;
   private final CreditService credits;
 
-  public ResumeService(ResumeRepository resumes, AesGcmCipherService cipher, CreditService credits) {
+  public ResumeService(
+      ResumeRepository resumes, AesGcmCipherService cipher, CreditService credits) {
     this.resumes = resumes;
     this.cipher = cipher;
     this.credits = credits;
@@ -44,9 +44,8 @@ public class ResumeService {
   }
 
   /**
-   * @throws CreditService.InsufficientCreditsException se o usuário não tiver
-   *         crédito disponível — 1 crédito é consumido por currículo criado
-   *         (não se aplica a edição, só à criação).
+   * @throws CreditService.InsufficientCreditsException se o usuário não tiver crédito disponível —
+   *     1 crédito é consumido por currículo criado (não se aplica a edição, só à criação).
    */
   @Transactional
   public ResumeView create(UUID userId, ResumeRequest req) {
@@ -59,14 +58,16 @@ public class ResumeService {
   }
 
   public Optional<ResumeView> update(UUID id, UUID userId, ResumeRequest req) {
-    return resumes.findById(id)
+    return resumes
+        .findById(id)
         .filter(r -> r.getUserId().equals(userId))
-        .map(r -> {
-          applyRequest(r, req);
-          r.setVersion(r.getVersion() + 1);
-          resumes.save(r);
-          return toView(r);
-        });
+        .map(
+            r -> {
+              applyRequest(r, req);
+              r.setVersion(r.getVersion() + 1);
+              resumes.save(r);
+              return toView(r);
+            });
   }
 
   public boolean delete(UUID id, UUID userId) {

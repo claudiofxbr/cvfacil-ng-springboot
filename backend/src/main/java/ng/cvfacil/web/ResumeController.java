@@ -16,9 +16,9 @@ import org.springframework.web.bind.annotation.*;
 /**
  * Endpoints de currículos — ativo apenas nos perfis de produção (@Profile("!local")).
  *
- * <p>Segurança: userId é extraído exclusivamente do JWT RS256 validado pelo Spring Security.
- * A lógica de cifragem/descoberta de propriedade vive em {@link ResumeService}, compartilhada
- * com {@link LocalResumeController} — este controller só resolve o userId e delega.
+ * <p>Segurança: userId é extraído exclusivamente do JWT RS256 validado pelo Spring Security. A
+ * lógica de cifragem/descoberta de propriedade vive em {@link ResumeService}, compartilhada com
+ * {@link LocalResumeController} — este controller só resolve o userId e delega.
  */
 @RestController
 @RequestMapping("/api/resumes")
@@ -43,7 +43,10 @@ public class ResumeController {
       @PathVariable UUID id, @AuthenticationPrincipal Jwt principal) {
     UUID userId = resolveUserId(principal);
     if (userId == null) return ResponseEntity.status(401).build();
-    return service.get(id, userId).map(ResponseEntity::ok).orElse(ResponseEntity.notFound().build());
+    return service
+        .get(id, userId)
+        .map(ResponseEntity::ok)
+        .orElse(ResponseEntity.notFound().build());
   }
 
   @PostMapping
@@ -65,7 +68,10 @@ public class ResumeController {
       @AuthenticationPrincipal Jwt principal) {
     UUID userId = resolveUserId(principal);
     if (userId == null) return ResponseEntity.status(401).build();
-    return service.update(id, userId, req).map(ResponseEntity::ok).orElse(ResponseEntity.notFound().build());
+    return service
+        .update(id, userId, req)
+        .map(ResponseEntity::ok)
+        .orElse(ResponseEntity.notFound().build());
   }
 
   @DeleteMapping("/{id}")
@@ -73,7 +79,9 @@ public class ResumeController {
       @PathVariable UUID id, @AuthenticationPrincipal Jwt principal) {
     UUID userId = resolveUserId(principal);
     if (userId == null) return ResponseEntity.status(401).build();
-    return service.delete(id, userId) ? ResponseEntity.noContent().build() : ResponseEntity.notFound().build();
+    return service.delete(id, userId)
+        ? ResponseEntity.noContent().build()
+        : ResponseEntity.notFound().build();
   }
 
   /** Extrai userId do JWT RS256 validado pelo Spring Security (única fonte confiável). */

@@ -63,8 +63,7 @@ class AesGcmCipherServiceTest {
 
   @Test
   void decrypt_emptyInput_throwsIllegalState() {
-    assertThatThrownBy(() -> cipher.decrypt(new byte[0]))
-        .isInstanceOf(IllegalStateException.class);
+    assertThatThrownBy(() -> cipher.decrypt(new byte[0])).isInstanceOf(IllegalStateException.class);
   }
 
   @Test

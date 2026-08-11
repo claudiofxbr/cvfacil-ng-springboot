@@ -31,17 +31,16 @@ import org.springframework.web.filter.OncePerRequestFilter;
 /**
  * Configuracao de seguranca SOMENTE para o profile "local".
  *
- * Diferencas vs. SecurityConfig (producao):
- *  - Ativa oauth2Login com um failureHandler que redireciona para o frontend em vez de
- *    retornar a pagina Whitelabel 404 quando as credenciais Google sao invalidas/dummy.
- *  - NAO ativa oauth2ResourceServer (nao precisa de JWKs reais).
- *  - CORS / CSRF / HSTS / headers continuam iguais — queremos testar esses controles.
- *  - Endpoints autenticados ficam abertos em dev para permitir smoke test sem JWT valido.
- *    Em producao, SecurityConfig exige autenticacao real.
+ * <p>Diferencas vs. SecurityConfig (producao): - Ativa oauth2Login com um failureHandler que
+ * redireciona para o frontend em vez de retornar a pagina Whitelabel 404 quando as credenciais
+ * Google sao invalidas/dummy. - NAO ativa oauth2ResourceServer (nao precisa de JWKs reais). - CORS
+ * / CSRF / HSTS / headers continuam iguais — queremos testar esses controles. - Endpoints
+ * autenticados ficam abertos em dev para permitir smoke test sem JWT valido. Em producao,
+ * SecurityConfig exige autenticacao real.
  */
 @Configuration
 @EnableWebSecurity
-@EnableMethodSecurity           // habilita @PreAuthorize / @PostAuthorize em todos os beans
+@EnableMethodSecurity // habilita @PreAuthorize / @PostAuthorize em todos os beans
 @Profile("local")
 public class LocalSecurityConfig {
 
@@ -80,10 +79,7 @@ public class LocalSecurityConfig {
                 csrf.csrfTokenRepository(CookieCsrfTokenRepository.withHttpOnlyFalse())
                     .csrfTokenRequestHandler(csrfHandler)
                     .ignoringRequestMatchers(
-                        "/api/auth/login",
-                        "/api/auth/register",
-                        "/api/**",
-                        "/actuator/health"))
+                        "/api/auth/login", "/api/auth/register", "/api/**", "/actuator/health"))
         .sessionManagement(sm -> sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
         .headers(
             h ->
@@ -93,43 +89,51 @@ public class LocalSecurityConfig {
                     .referrerPolicy(
                         rp ->
                             rp.policy(
-                                org.springframework.security.web.header.writers.ReferrerPolicyHeaderWriter.ReferrerPolicy.STRICT_ORIGIN_WHEN_CROSS_ORIGIN)))
+                                org.springframework.security.web.header.writers
+                                    .ReferrerPolicyHeaderWriter.ReferrerPolicy
+                                    .STRICT_ORIGIN_WHEN_CROSS_ORIGIN)))
         .authorizeHttpRequests(
             auth ->
-                auth.requestMatchers(HttpMethod.GET, "/actuator/**", "/api/health").permitAll()
-                    .requestMatchers("/api/auth/**").permitAll()
-                    .anyRequest().permitAll())
+                auth.requestMatchers(HttpMethod.GET, "/actuator/**", "/api/health")
+                    .permitAll()
+                    .requestMatchers("/api/auth/**")
+                    .permitAll()
+                    .anyRequest()
+                    .permitAll())
         // Ativa oauth2Login para que /oauth2/authorization/google exista.
         // Se as credenciais forem dummy (local-dev-unused), um filtro anterior
         // intercepta a requisicao e redireciona ao frontend antes de chegar ao Google.
-        .oauth2Login(oauth -> oauth
-            .failureHandler(new SimpleUrlAuthenticationFailureHandler(
-                "http://localhost:3000/login?error=oauth_failed")));
+        .oauth2Login(
+            oauth ->
+                oauth.failureHandler(
+                    new SimpleUrlAuthenticationFailureHandler(
+                        "http://localhost:3000/login?error=oauth_failed")));
 
     // Intercepta /oauth2/authorization/google ANTES que o filtro do Spring
     // redirecione ao Google — evita o erro 401 invalid_client do Google
     // quando as credenciais sao dummy (local-dev-unused) ou nao configuradas.
-    http.addFilterBefore(new OncePerRequestFilter() {
-      @Override
-      protected void doFilterInternal(
-          HttpServletRequest request, HttpServletResponse response, FilterChain chain)
-          throws ServletException, IOException {
-        if ("/oauth2/authorization/google".equals(request.getRequestURI())) {
-          boolean notConfigured =
-              googleClientId == null
-                  || googleClientId.isBlank()
-                  || "local-dev-unused".equals(googleClientId);
-          if (notConfigured) {
-            // Credenciais dummy → abre o formulário de mock OAuth no frontend
-            // em vez de mostrar uma mensagem de erro.
-            response.sendRedirect(
-                "http://localhost:3000/login?mock_oauth=true");
-            return;
+    http.addFilterBefore(
+        new OncePerRequestFilter() {
+          @Override
+          protected void doFilterInternal(
+              HttpServletRequest request, HttpServletResponse response, FilterChain chain)
+              throws ServletException, IOException {
+            if ("/oauth2/authorization/google".equals(request.getRequestURI())) {
+              boolean notConfigured =
+                  googleClientId == null
+                      || googleClientId.isBlank()
+                      || "local-dev-unused".equals(googleClientId);
+              if (notConfigured) {
+                // Credenciais dummy → abre o formulário de mock OAuth no frontend
+                // em vez de mostrar uma mensagem de erro.
+                response.sendRedirect("http://localhost:3000/login?mock_oauth=true");
+                return;
+              }
+            }
+            chain.doFilter(request, response);
           }
-        }
-        chain.doFilter(request, response);
-      }
-    }, OAuth2AuthorizationRequestRedirectFilter.class);
+        },
+        OAuth2AuthorizationRequestRedirectFilter.class);
 
     return http.build();
   }

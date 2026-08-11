@@ -38,21 +38,67 @@ public class Resume {
   private Instant updatedAt = Instant.now();
 
   @PreUpdate
-  void onUpdate() { this.updatedAt = Instant.now(); }
+  void onUpdate() {
+    this.updatedAt = Instant.now();
+  }
 
-  public UUID getId() { return id; }
-  public UUID getUserId() { return userId; }
-  public void setUserId(UUID userId) { this.userId = userId; }
-  public String getLayoutId() { return layoutId; }
-  public void setLayoutId(String layoutId) { this.layoutId = layoutId; }
-  public String getLocale() { return locale; }
-  public void setLocale(String locale) { this.locale = locale; }
-  public int getVersion() { return version; }
-  public void setVersion(int v) { this.version = v; }
-  public byte[] getContentEnc() { return contentEnc; }
-  public void setContentEnc(byte[] c) { this.contentEnc = c; }
-  public String getPhotoUrl() { return photoUrl; }
-  public void setPhotoUrl(String p) { this.photoUrl = p; }
-  public Instant getCreatedAt() { return createdAt; }
-  public Instant getUpdatedAt() { return updatedAt; }
+  public UUID getId() {
+    return id;
+  }
+
+  public UUID getUserId() {
+    return userId;
+  }
+
+  public void setUserId(UUID userId) {
+    this.userId = userId;
+  }
+
+  public String getLayoutId() {
+    return layoutId;
+  }
+
+  public void setLayoutId(String layoutId) {
+    this.layoutId = layoutId;
+  }
+
+  public String getLocale() {
+    return locale;
+  }
+
+  public void setLocale(String locale) {
+    this.locale = locale;
+  }
+
+  public int getVersion() {
+    return version;
+  }
+
+  public void setVersion(int v) {
+    this.version = v;
+  }
+
+  public byte[] getContentEnc() {
+    return contentEnc;
+  }
+
+  public void setContentEnc(byte[] c) {
+    this.contentEnc = c;
+  }
+
+  public String getPhotoUrl() {
+    return photoUrl;
+  }
+
+  public void setPhotoUrl(String p) {
+    this.photoUrl = p;
+  }
+
+  public Instant getCreatedAt() {
+    return createdAt;
+  }
+
+  public Instant getUpdatedAt() {
+    return updatedAt;
+  }
 }

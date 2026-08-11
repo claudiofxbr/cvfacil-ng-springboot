@@ -9,8 +9,7 @@ import java.util.UUID;
 public class AuthDtos {
 
   public record LoginRequest(
-      @Email @NotBlank String email,
-      @NotBlank @Size(min = 10, max = 256) String password) {}
+      @Email @NotBlank String email, @NotBlank @Size(min = 10, max = 256) String password) {}
 
   public record RegisterRequest(
       @Email @NotBlank String email,

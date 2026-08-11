@@ -28,14 +28,43 @@ public class PasswordResetToken {
   @Column(name = "created_at", nullable = false, updatable = false)
   private Instant createdAt = Instant.now();
 
-  public UUID getId() { return id; }
-  public UUID getUserId() { return userId; }
-  public void setUserId(UUID userId) { this.userId = userId; }
-  public String getTokenHash() { return tokenHash; }
-  public void setTokenHash(String tokenHash) { this.tokenHash = tokenHash; }
-  public Instant getExpiresAt() { return expiresAt; }
-  public void setExpiresAt(Instant expiresAt) { this.expiresAt = expiresAt; }
-  public Instant getUsedAt() { return usedAt; }
-  public void setUsedAt(Instant usedAt) { this.usedAt = usedAt; }
-  public Instant getCreatedAt() { return createdAt; }
+  public UUID getId() {
+    return id;
+  }
+
+  public UUID getUserId() {
+    return userId;
+  }
+
+  public void setUserId(UUID userId) {
+    this.userId = userId;
+  }
+
+  public String getTokenHash() {
+    return tokenHash;
+  }
+
+  public void setTokenHash(String tokenHash) {
+    this.tokenHash = tokenHash;
+  }
+
+  public Instant getExpiresAt() {
+    return expiresAt;
+  }
+
+  public void setExpiresAt(Instant expiresAt) {
+    this.expiresAt = expiresAt;
+  }
+
+  public Instant getUsedAt() {
+    return usedAt;
+  }
+
+  public void setUsedAt(Instant usedAt) {
+    this.usedAt = usedAt;
+  }
+
+  public Instant getCreatedAt() {
+    return createdAt;
+  }
 }

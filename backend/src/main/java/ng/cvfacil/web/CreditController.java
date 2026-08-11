@@ -12,9 +12,8 @@ import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.*;
 
 /**
- * Carteira de créditos do usuário logado — ativo apenas em produção
- * (@Profile("!local")). Lógica compartilhada com LocalCreditController em
- * CreditRequestSupport.
+ * Carteira de créditos do usuário logado — ativo apenas em produção (@Profile("!local")). Lógica
+ * compartilhada com LocalCreditController em CreditRequestSupport.
  */
 @RestController
 @RequestMapping("/api/credits")

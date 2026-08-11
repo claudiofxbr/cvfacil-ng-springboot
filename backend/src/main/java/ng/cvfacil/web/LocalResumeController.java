@@ -18,13 +18,13 @@ import org.springframework.web.bind.annotation.*;
 /**
  * Versão local de ResumeController — ativa apenas em @Profile("local").
  *
- * <p>Diferença vs. produção: aceita STUB tokens gerados por JwtService em dev,
- * extraindo o userId diretamente do header {@code Authorization: Bearer STUB_ACCESS.<userId>.*}.
- * Toda a lógica de CRUD/cifragem vive em {@link ResumeService}, compartilhada com
- * {@link ResumeController} — só a resolução de userId difere entre profiles.
+ * <p>Diferença vs. produção: aceita STUB tokens gerados por JwtService em dev, extraindo o userId
+ * diretamente do header {@code Authorization: Bearer STUB_ACCESS.<userId>.*}. Toda a lógica de
+ * CRUD/cifragem vive em {@link ResumeService}, compartilhada com {@link ResumeController} — só a
+ * resolução de userId difere entre profiles.
  *
- * <p>IMPORTANTE: STUB tokens NUNCA chegam a produção. Este controller deve ser
- * eliminado quando o ambiente de dev migrar para RS256 completo.
+ * <p>IMPORTANTE: STUB tokens NUNCA chegam a produção. Este controller deve ser eliminado quando o
+ * ambiente de dev migrar para RS256 completo.
  */
 @RestController
 @RequestMapping("/api/resumes")
@@ -51,7 +51,10 @@ public class LocalResumeController {
       @PathVariable UUID id, @AuthenticationPrincipal Jwt principal, HttpServletRequest request) {
     UUID userId = resolveUserId(principal, request);
     if (userId == null) return ResponseEntity.status(401).build();
-    return service.get(id, userId).map(ResponseEntity::ok).orElse(ResponseEntity.notFound().build());
+    return service
+        .get(id, userId)
+        .map(ResponseEntity::ok)
+        .orElse(ResponseEntity.notFound().build());
   }
 
   @PostMapping
@@ -76,7 +79,10 @@ public class LocalResumeController {
       HttpServletRequest request) {
     UUID userId = resolveUserId(principal, request);
     if (userId == null) return ResponseEntity.status(401).build();
-    return service.update(id, userId, req).map(ResponseEntity::ok).orElse(ResponseEntity.notFound().build());
+    return service
+        .update(id, userId, req)
+        .map(ResponseEntity::ok)
+        .orElse(ResponseEntity.notFound().build());
   }
 
   @DeleteMapping("/{id}")
@@ -84,7 +90,9 @@ public class LocalResumeController {
       @PathVariable UUID id, @AuthenticationPrincipal Jwt principal, HttpServletRequest request) {
     UUID userId = resolveUserId(principal, request);
     if (userId == null) return ResponseEntity.status(401).build();
-    return service.delete(id, userId) ? ResponseEntity.noContent().build() : ResponseEntity.notFound().build();
+    return service.delete(id, userId)
+        ? ResponseEntity.noContent().build()
+        : ResponseEntity.notFound().build();
   }
 
   private UUID resolveUserId(Jwt principal, HttpServletRequest request) {

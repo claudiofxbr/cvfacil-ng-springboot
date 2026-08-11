@@ -146,7 +146,8 @@ class JwtServiceTest {
     ReflectionTestUtils.setField(svc, "accessTtlMinutes", 15);
     ReflectionTestUtils.setField(svc, "refreshTtlDays", 7);
     ReflectionTestUtils.setField(svc, "privateKeyPem", "INVALIDO_NAO_E_PEM");
-    assertThatThrownBy(svc::init).isInstanceOf(IllegalStateException.class)
+    assertThatThrownBy(svc::init)
+        .isInstanceOf(IllegalStateException.class)
         .hasMessageContaining("JWT_PRIVATE_KEY");
   }
 }

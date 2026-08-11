@@ -8,15 +8,13 @@ import ng.cvfacil.repository.UserRepository;
 import org.springframework.stereotype.Service;
 
 /**
- * Regras de RBAC compartilhadas entre AdminController (produção) e
- * LocalAdminController (dev local) — mesmo padrão de dedup usado em
- * ResumeService/AIImportRequestSupport: a lógica sensível a segurança vive
- * em um único lugar.
+ * Regras de RBAC compartilhadas entre AdminController (produção) e LocalAdminController (dev local)
+ * — mesmo padrão de dedup usado em ResumeService/AIImportRequestSupport: a lógica sensível a
+ * segurança vive em um único lugar.
  *
- * Papéis (ver User.Role):
- *   USER (Cliente): fora do escopo deste serviço — só mexe nos próprios currículos.
- *   ADMIN: tudo abaixo, EXCETO excluir usuário e conceder créditos.
- *   ROOT_MASTER (Root): tudo, sem exceção.
+ * <p>Papéis (ver User.Role): USER (Cliente): fora do escopo deste serviço — só mexe nos próprios
+ * currículos. ADMIN: tudo abaixo, EXCETO excluir usuário e conceder créditos. ROOT_MASTER (Root):
+ * tudo, sem exceção.
  */
 @Service
 public class AdminService {
@@ -39,12 +37,12 @@ public class AdminService {
   }
 
   /**
-   * Exclusão de usuário — SOMENTE ROOT_MASTER. O controller deve garantir que
-   * {@code actingRole == Role.ROOT_MASTER} antes de chamar este método; aqui
-   * repetimos a checagem como segunda barreira (defense in depth).
+   * Exclusão de usuário — SOMENTE ROOT_MASTER. O controller deve garantir que {@code actingRole ==
+   * Role.ROOT_MASTER} antes de chamar este método; aqui repetimos a checagem como segunda barreira
+   * (defense in depth).
    *
-   * @return true se excluído; false se não autorizado, alvo inexistente, ou
-   *         alvo é outro ROOT_MASTER (nunca excluível por esta rota).
+   * @return true se excluído; false se não autorizado, alvo inexistente, ou alvo é outro
+   *     ROOT_MASTER (nunca excluível por esta rota).
    */
   public boolean deleteUser(UUID actingUserId, User.Role actingRole, UUID targetUserId) {
     if (actingRole != User.Role.ROOT_MASTER) return false;

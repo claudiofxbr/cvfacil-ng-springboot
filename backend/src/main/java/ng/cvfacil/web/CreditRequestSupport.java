@@ -1,15 +1,15 @@
 package ng.cvfacil.web;
 
-import ng.cvfacil.domain.CreditTransaction;
-import ng.cvfacil.dto.CreditDtos.WalletView;
-import ng.cvfacil.dto.CreditDtos.TransactionView;
-import ng.cvfacil.service.CreditService;
 import java.util.UUID;
+import ng.cvfacil.domain.CreditTransaction;
+import ng.cvfacil.dto.CreditDtos.TransactionView;
+import ng.cvfacil.dto.CreditDtos.WalletView;
+import ng.cvfacil.service.CreditService;
 import org.springframework.http.ResponseEntity;
 
 /**
- * Lógica compartilhada entre CreditController (produção) e LocalCreditController
- * (dev local) — mesmo padrão de dedup já usado para Resume/AIImport/Admin.
+ * Lógica compartilhada entre CreditController (produção) e LocalCreditController (dev local) —
+ * mesmo padrão de dedup já usado para Resume/AIImport/Admin.
  */
 final class CreditRequestSupport {
 
@@ -17,9 +17,7 @@ final class CreditRequestSupport {
 
   static ResponseEntity<WalletView> wallet(CreditService credits, UUID userId) {
     int balance = credits.balanceOf(userId);
-    var history = credits.historyOf(userId).stream()
-        .map(CreditRequestSupport::toView)
-        .toList();
+    var history = credits.historyOf(userId).stream().map(CreditRequestSupport::toView).toList();
     return ResponseEntity.ok(new WalletView(balance, history));
   }
 
@@ -40,7 +38,11 @@ final class CreditRequestSupport {
 
   private static TransactionView toView(CreditTransaction tx) {
     return new TransactionView(
-        tx.getId(), tx.getType().name(), tx.getAmount(), tx.getBalanceAfter(),
-        tx.getReference(), tx.getCreatedAt());
+        tx.getId(),
+        tx.getType().name(),
+        tx.getAmount(),
+        tx.getBalanceAfter(),
+        tx.getReference(),
+        tx.getCreatedAt());
   }
 }

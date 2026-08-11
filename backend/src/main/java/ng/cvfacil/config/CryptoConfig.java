@@ -1,8 +1,8 @@
 package ng.cvfacil.config;
 
+import java.util.Base64;
 import javax.crypto.SecretKey;
 import javax.crypto.spec.SecretKeySpec;
-import java.util.Base64;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -10,8 +10,8 @@ import org.springframework.context.annotation.Configuration;
 /**
  * Configuração da chave mestra AES-256-GCM usada para cifragem column-level (SEC-09).
  *
- * A chave vem de ENCRYPTION_MASTER_KEY (base64 de 32 bytes). Em produção, a chave
- * é provisionada via KMS; nunca deve aparecer no repositório.
+ * <p>A chave vem de ENCRYPTION_MASTER_KEY (base64 de 32 bytes). Em produção, a chave é provisionada
+ * via KMS; nunca deve aparecer no repositório.
  */
 @Configuration
 public class CryptoConfig {

@@ -14,22 +14,20 @@ import org.springframework.stereotype.Service;
 /**
  * Rate limit baseado em contador+TTL Redis com operação atômica via script Lua.
  *
- * RACE CONDITION CORRIGIDA: a versão anterior usava dois comandos Redis separados
- * (INCR + EXPIRE), não atômicos. Em ambiente distribuído (múltiplas instâncias) isso
- * causava dois problemas:
- *   1. Duas instâncias incrementam simultaneamente → apenas uma define o TTL →
- *      o contador pode nunca expirar (rate limit permanente acidental).
- *   2. INCR bem-sucedido + falha no EXPIRE → contador sem TTL, cresce para sempre.
+ * <p>RACE CONDITION CORRIGIDA: a versão anterior usava dois comandos Redis separados (INCR +
+ * EXPIRE), não atômicos. Em ambiente distribuído (múltiplas instâncias) isso causava dois
+ * problemas: 1. Duas instâncias incrementam simultaneamente → apenas uma define o TTL → o contador
+ * pode nunca expirar (rate limit permanente acidental). 2. INCR bem-sucedido + falha no EXPIRE →
+ * contador sem TTL, cresce para sempre.
  *
- * SOLUÇÃO: script Lua executado atomicamente pelo Redis (single-threaded).
- * O script incrementa e, se for o primeiro acesso (count == 1), define o TTL na
- * mesma transação — garantindo atomicidade sem precisar de MULTI/EXEC.
+ * <p>SOLUÇÃO: script Lua executado atomicamente pelo Redis (single-threaded). O script incrementa
+ * e, se for o primeiro acesso (count == 1), define o TTL na mesma transação — garantindo
+ * atomicidade sem precisar de MULTI/EXEC.
  *
- * FAIL-OPEN CORRIGIDO: antes, uma queda do Redis liberava 100% das chamadas
- * (ex.: força bruta em /api/auth/login sem nenhuma proteção). Agora existe um
- * segundo nível de defesa em memória (por instância, não distribuído — é um
- * fallback, não substitui o Redis) que continua aplicando o limite localmente
- * enquanto o Redis estiver fora do ar, e loga em ERROR (não warn) para que a
+ * <p>FAIL-OPEN CORRIGIDO: antes, uma queda do Redis liberava 100% das chamadas (ex.: força bruta em
+ * /api/auth/login sem nenhuma proteção). Agora existe um segundo nível de defesa em memória (por
+ * instância, não distribuído — é um fallback, não substitui o Redis) que continua aplicando o
+ * limite localmente enquanto o Redis estiver fora do ar, e loga em ERROR (não warn) para que a
  * queda seja visível em alertas.
  */
 @Service
@@ -46,12 +44,10 @@ public class RateLimitService {
   }
 
   /**
-   * Script Lua atômico:
-   *   - INCR na chave
-   *   - Se count == 1 (primeira requisição nesta janela): define EXPIRE em segundos
-   *   - Retorna o valor atual do contador
+   * Script Lua atômico: - INCR na chave - Se count == 1 (primeira requisição nesta janela): define
+   * EXPIRE em segundos - Retorna o valor atual do contador
    *
-   * Executado atomicamente pelo Redis — sem race condition possível.
+   * <p>Executado atomicamente pelo Redis — sem race condition possível.
    */
   private static final DefaultRedisScript<Long> RATE_LIMIT_SCRIPT;
 
@@ -75,31 +71,30 @@ public class RateLimitService {
   /**
    * Verifica e incrementa o contador de rate limit.
    *
-   * @param key    Chave identificadora (ex: "login:192.168.1.1")
-   * @param limit  Número máximo de requisições permitidas na janela
+   * @param key Chave identificadora (ex: "login:192.168.1.1")
+   * @param limit Número máximo de requisições permitidas na janela
    * @param window Duração da janela de tempo
    * @return true se a requisição é permitida, false se o limite foi excedido
    */
   public boolean allow(String key, int limit, Duration window) {
     try {
-      Long count = redis.execute(
-          RATE_LIMIT_SCRIPT,
-          List.of("rl:" + key),
-          String.valueOf(window.getSeconds()));
+      Long count =
+          redis.execute(
+              RATE_LIMIT_SCRIPT, List.of("rl:" + key), String.valueOf(window.getSeconds()));
       return count == null || count <= limit;
     } catch (RedisConnectionFailureException e) {
       log.error(
           "[rate-limit] Redis indisponível para '{}' — usando fallback local em memória "
               + "(protege apenas esta instância; não é distribuído). {}",
-          key, e.getMessage());
+          key,
+          e.getMessage());
       return allowLocalFallback(key, limit, window);
     }
   }
 
   /**
-   * Janela fixa em memória, por chave. Só entra em uso durante uma queda do
-   * Redis — não substitui a proteção distribuída, apenas evita que o rate
-   * limit desapareça por completo nesse intervalo.
+   * Janela fixa em memória, por chave. Só entra em uso durante uma queda do Redis — não substitui a
+   * proteção distribuída, apenas evita que o rate limit desapareça por completo nesse intervalo.
    */
   private boolean allowLocalFallback(String key, int limit, Duration window) {
     long now = System.currentTimeMillis();

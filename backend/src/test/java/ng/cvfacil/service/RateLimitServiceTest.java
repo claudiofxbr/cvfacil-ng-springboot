@@ -18,14 +18,13 @@ import org.springframework.data.redis.core.script.RedisScript;
 /**
  * Testes unitários para RateLimitService.
  *
- * <p>Redis é mockado — os testes verificam a lógica de allow/deny e o
- * comportamento de fail-open quando o Redis está indisponível.
+ * <p>Redis é mockado — os testes verificam a lógica de allow/deny e o comportamento de fail-open
+ * quando o Redis está indisponível.
  */
 @ExtendWith(MockitoExtension.class)
 class RateLimitServiceTest {
 
-  @Mock
-  private StringRedisTemplate redis;
+  @Mock private StringRedisTemplate redis;
 
   private RateLimitService service;
 
@@ -71,21 +70,18 @@ class RateLimitServiceTest {
   void allow_prefixesKeyWithRl() {
     when(redis.execute(any(RedisScript.class), anyList(), any(String.class))).thenReturn(1L);
     service.allow("login:1.2.3.4", 5, Duration.ofMinutes(1));
-    verify(redis).execute(
-        any(RedisScript.class),
-        eq(List.of("rl:login:1.2.3.4")),
-        eq("60")   // window de 60 segundos
-    );
+    verify(redis)
+        .execute(
+            any(RedisScript.class),
+            eq(List.of("rl:login:1.2.3.4")),
+            eq("60") // window de 60 segundos
+            );
   }
 
   @Test
   void allow_passesWindowInSeconds() {
     when(redis.execute(any(RedisScript.class), anyList(), any(String.class))).thenReturn(1L);
     service.allow("key", 10, Duration.ofSeconds(90));
-    verify(redis).execute(
-        any(RedisScript.class),
-        anyList(),
-        eq("90")
-    );
+    verify(redis).execute(any(RedisScript.class), anyList(), eq("90"));
   }
 }

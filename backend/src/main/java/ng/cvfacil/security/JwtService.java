@@ -24,20 +24,18 @@ import org.springframework.stereotype.Service;
 /**
  * Emissão de tokens JWT RS256.
  *
- * <p>Em produção: lê a chave privada RSA-2048 de {@code cvfacil.jwt.private-key}
- * (variável de ambiente {@code JWT_PRIVATE_KEY}) e assina tokens com Nimbus JOSE.
- * Os tokens de acesso incluem claims {@code sub}, {@code email}, {@code role},
- * {@code locale}, {@code iat}, {@code exp} e {@code iss}. O token de refresh
- * inclui adicionalmente {@code type=refresh}.
+ * <p>Em produção: lê a chave privada RSA-2048 de {@code cvfacil.jwt.private-key} (variável de
+ * ambiente {@code JWT_PRIVATE_KEY}) e assina tokens com Nimbus JOSE. Os tokens de acesso incluem
+ * claims {@code sub}, {@code email}, {@code role}, {@code locale}, {@code iat}, {@code exp} e
+ * {@code iss}. O token de refresh inclui adicionalmente {@code type=refresh}.
  *
- * <p>Em dev local (quando {@code JWT_PRIVATE_KEY} não está definida): emite tokens
- * stub não assinados aceitos apenas pelo {@code LocalResumeController}.  Nenhum
- * endpoint de produção aceita esses stubs.
+ * <p>Em dev local (quando {@code JWT_PRIVATE_KEY} não está definida): emite tokens stub não
+ * assinados aceitos apenas pelo {@code LocalResumeController}. Nenhum endpoint de produção aceita
+ * esses stubs.
  *
- * <p>Rotação de chaves: gere um novo par RSA, atualize {@code JWT_PRIVATE_KEY} e
- * {@code JWT_PUBLIC_KEY} no ambiente de produção; tokens antigos expiram em no
- * máximo {@code accessTtlMinutes} (padrão 15 min) ou {@code refreshTtlDays}
- * (padrão 7 dias).
+ * <p>Rotação de chaves: gere um novo par RSA, atualize {@code JWT_PRIVATE_KEY} e {@code
+ * JWT_PUBLIC_KEY} no ambiente de produção; tokens antigos expiram em no máximo {@code
+ * accessTtlMinutes} (padrão 15 min) ou {@code refreshTtlDays} (padrão 7 dias).
  */
 @Service
 public class JwtService {
@@ -58,29 +56,32 @@ public class JwtService {
   private String privateKeyPem;
 
   /**
-   * RSA signer inicializado no startup; {@code null} quando {@code JWT_PRIVATE_KEY}
-   * não está configurada (modo dev/stub).
+   * RSA signer inicializado no startup; {@code null} quando {@code JWT_PRIVATE_KEY} não está
+   * configurada (modo dev/stub).
    */
   private RSASSASigner signer;
 
   @PostConstruct
   void init() {
     if (privateKeyPem == null || privateKeyPem.isBlank()) {
-      log.warn("[JwtService] JWT_PRIVATE_KEY nao configurada — emitindo STUB tokens. "
-          + "Aceitaveis apenas em dev local (LocalResumeController). "
-          + "Em producao, defina JWT_PRIVATE_KEY com a chave RSA-2048 PEM.");
+      log.warn(
+          "[JwtService] JWT_PRIVATE_KEY nao configurada — emitindo STUB tokens. "
+              + "Aceitaveis apenas em dev local (LocalResumeController). "
+              + "Em producao, defina JWT_PRIVATE_KEY com a chave RSA-2048 PEM.");
       return;
     }
     try {
-      String stripped = privateKeyPem
-          .replace("-----BEGIN PRIVATE KEY-----", "")
-          .replace("-----END PRIVATE KEY-----", "")
-          .replace("-----BEGIN RSA PRIVATE KEY-----", "")
-          .replace("-----END RSA PRIVATE KEY-----", "")
-          .replaceAll("\\s+", "");
+      String stripped =
+          privateKeyPem
+              .replace("-----BEGIN PRIVATE KEY-----", "")
+              .replace("-----END PRIVATE KEY-----", "")
+              .replace("-----BEGIN RSA PRIVATE KEY-----", "")
+              .replace("-----END RSA PRIVATE KEY-----", "")
+              .replaceAll("\\s+", "");
       byte[] decoded = Base64.getDecoder().decode(stripped);
-      RSAPrivateKey privateKey = (RSAPrivateKey)
-          KeyFactory.getInstance("RSA").generatePrivate(new PKCS8EncodedKeySpec(decoded));
+      RSAPrivateKey privateKey =
+          (RSAPrivateKey)
+              KeyFactory.getInstance("RSA").generatePrivate(new PKCS8EncodedKeySpec(decoded));
       signer = new RSASSASigner(privateKey);
       log.info("[JwtService] Chave RSA carregada — tokens RS256 ativos.");
     } catch (Exception e) {
@@ -90,8 +91,8 @@ public class JwtService {
   }
 
   /**
-   * Emite um access token JWT (validade {@code accessTtlMinutes}).
-   * Retorna um STUB não assinado quando a chave privada não está configurada.
+   * Emite um access token JWT (validade {@code accessTtlMinutes}). Retorna um STUB não assinado
+   * quando a chave privada não está configurada.
    */
   public String issueAccessToken(User user) {
     if (signer == null) {
@@ -99,29 +100,30 @@ public class JwtService {
     }
     try {
       Instant now = Instant.now();
-      JWTClaimsSet claims = new JWTClaimsSet.Builder()
-          .issuer(issuer)
-          .subject(user.getId().toString())
-          .claim("email", user.getEmail())
-          .claim("role", user.getRole().name())
-          .claim("locale", user.getLocale())
-          .issueTime(Date.from(now))
-          .expirationTime(Date.from(now.plus(accessTtl())))
-          .jwtID(UUID.randomUUID().toString())
-          .build();
+      JWTClaimsSet claims =
+          new JWTClaimsSet.Builder()
+              .issuer(issuer)
+              .subject(user.getId().toString())
+              .claim("email", user.getEmail())
+              .claim("role", user.getRole().name())
+              .claim("locale", user.getLocale())
+              .issueTime(Date.from(now))
+              .expirationTime(Date.from(now.plus(accessTtl())))
+              .jwtID(UUID.randomUUID().toString())
+              .build();
       SignedJWT jwt = new SignedJWT(new JWSHeader(JWSAlgorithm.RS256), claims);
       jwt.sign(signer);
       return jwt.serialize();
     } catch (Exception e) {
-      throw new IllegalStateException("[JwtService] Erro ao assinar access token: " + e.getMessage(), e);
+      throw new IllegalStateException(
+          "[JwtService] Erro ao assinar access token: " + e.getMessage(), e);
     }
   }
 
   /**
-   * Emite um refresh token (validade {@code refreshTtlDays}).
-   * Em produção é também um JWT RS256 com {@code type=refresh} para validação
-   * criptográfica no endpoint {@code /api/auth/refresh}.
-   * Em dev retorna o formato STUB legado.
+   * Emite um refresh token (validade {@code refreshTtlDays}). Em produção é também um JWT RS256 com
+   * {@code type=refresh} para validação criptográfica no endpoint {@code /api/auth/refresh}. Em dev
+   * retorna o formato STUB legado.
    */
   public String issueRefreshToken(UUID userId) {
     if (signer == null) {
@@ -129,34 +131,43 @@ public class JwtService {
     }
     try {
       Instant now = Instant.now();
-      JWTClaimsSet claims = new JWTClaimsSet.Builder()
-          .issuer(issuer)
-          .subject(userId.toString())
-          .claim("type", "refresh")
-          .issueTime(Date.from(now))
-          .expirationTime(Date.from(now.plus(refreshTtl())))
-          .jwtID(UUID.randomUUID().toString())
-          .build();
+      JWTClaimsSet claims =
+          new JWTClaimsSet.Builder()
+              .issuer(issuer)
+              .subject(userId.toString())
+              .claim("type", "refresh")
+              .issueTime(Date.from(now))
+              .expirationTime(Date.from(now.plus(refreshTtl())))
+              .jwtID(UUID.randomUUID().toString())
+              .build();
       SignedJWT jwt = new SignedJWT(new JWSHeader(JWSAlgorithm.RS256), claims);
       jwt.sign(signer);
       return jwt.serialize();
     } catch (Exception e) {
-      throw new IllegalStateException("[JwtService] Erro ao assinar refresh token: " + e.getMessage(), e);
+      throw new IllegalStateException(
+          "[JwtService] Erro ao assinar refresh token: " + e.getMessage(), e);
     }
   }
 
   /** {@code true} quando a chave privada está carregada e tokens RS256 reais são emitidos. */
-  public boolean isRealSigningActive() { return signer != null; }
+  public boolean isRealSigningActive() {
+    return signer != null;
+  }
 
-  public Duration accessTtl()  { return Duration.ofMinutes(accessTtlMinutes); }
-  public Duration refreshTtl() { return Duration.ofDays(refreshTtlDays); }
+  public Duration accessTtl() {
+    return Duration.ofMinutes(accessTtlMinutes);
+  }
+
+  public Duration refreshTtl() {
+    return Duration.ofDays(refreshTtlDays);
+  }
 
   public Map<String, Object> buildClaims(User user) {
     return Map.of(
-        "iss",    issuer,
-        "sub",    user.getId().toString(),
-        "email",  user.getEmail(),
-        "role",   user.getRole().name(),
+        "iss", issuer,
+        "sub", user.getId().toString(),
+        "email", user.getEmail(),
+        "role", user.getRole().name(),
         "locale", user.getLocale());
   }
 }

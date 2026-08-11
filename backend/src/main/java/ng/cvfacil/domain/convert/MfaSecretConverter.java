@@ -8,11 +8,10 @@ import ng.cvfacil.service.AesGcmCipherService;
 import org.springframework.stereotype.Component;
 
 /**
- * Cifra mfa_secret em repouso com o mesmo AesGcmCipherService usado para
- * Resume.contentEnc (AES-256-GCM). O campo era armazenado em texto plano —
- * a feature de MFA ainda não tem nenhum fluxo que leia/grave este campo
- * (ROOT_MASTER MFA é scaffolding), mas corrigimos o armazenamento agora
- * para que a implementação futura já nasça segura por padrão.
+ * Cifra mfa_secret em repouso com o mesmo AesGcmCipherService usado para Resume.contentEnc
+ * (AES-256-GCM). O campo era armazenado em texto plano — a feature de MFA ainda não tem nenhum
+ * fluxo que leia/grave este campo (ROOT_MASTER MFA é scaffolding), mas corrigimos o armazenamento
+ * agora para que a implementação futura já nasça segura por padrão.
  */
 @Component
 @Converter

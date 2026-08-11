@@ -38,20 +38,67 @@ public class AuditLog {
   @Column(name = "created_at", nullable = false, updatable = false)
   private Instant createdAt = Instant.now();
 
-  public Long getId() { return id; }
-  public UUID getUserId() { return userId; }
-  public void setUserId(UUID u) { this.userId = u; }
-  public String getAction() { return action; }
-  public void setAction(String a) { this.action = a; }
-  public String getIp() { return ip; }
-  public void setIp(String i) { this.ip = i; }
-  public String getUserAgent() { return userAgent; }
-  public void setUserAgent(String ua) { this.userAgent = ua; }
-  public String getDetailsJson() { return detailsJson; }
-  public void setDetailsJson(String d) { this.detailsJson = d; }
-  public String getPrevHash() { return prevHash; }
-  public void setPrevHash(String p) { this.prevHash = p; }
-  public String getSelfHash() { return selfHash; }
-  public void setSelfHash(String s) { this.selfHash = s; }
-  public Instant getCreatedAt() { return createdAt; }
+  public Long getId() {
+    return id;
+  }
+
+  public UUID getUserId() {
+    return userId;
+  }
+
+  public void setUserId(UUID u) {
+    this.userId = u;
+  }
+
+  public String getAction() {
+    return action;
+  }
+
+  public void setAction(String a) {
+    this.action = a;
+  }
+
+  public String getIp() {
+    return ip;
+  }
+
+  public void setIp(String i) {
+    this.ip = i;
+  }
+
+  public String getUserAgent() {
+    return userAgent;
+  }
+
+  public void setUserAgent(String ua) {
+    this.userAgent = ua;
+  }
+
+  public String getDetailsJson() {
+    return detailsJson;
+  }
+
+  public void setDetailsJson(String d) {
+    this.detailsJson = d;
+  }
+
+  public String getPrevHash() {
+    return prevHash;
+  }
+
+  public void setPrevHash(String p) {
+    this.prevHash = p;
+  }
+
+  public String getSelfHash() {
+    return selfHash;
+  }
+
+  public void setSelfHash(String s) {
+    this.selfHash = s;
+  }
+
+  public Instant getCreatedAt() {
+    return createdAt;
+  }
 }

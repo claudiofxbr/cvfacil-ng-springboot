@@ -20,8 +20,8 @@ import ng.cvfacil.service.PasswordResetService;
 import ng.cvfacil.service.RateLimitService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.http.ResponseEntity;
 import org.springframework.http.ResponseCookie;
+import org.springframework.http.ResponseEntity;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
@@ -41,8 +41,8 @@ public class AuthController {
   private final CreditService credits;
 
   /**
-   * JwtDecoder apenas disponível no profile "!local" (SecurityConfig).
-   * Injetado de forma opcional para que AuthController funcione também em dev local.
+   * JwtDecoder apenas disponível no profile "!local" (SecurityConfig). Injetado de forma opcional
+   * para que AuthController funcione também em dev local.
    */
   @Autowired(required = false)
   private JwtDecoder jwtDecoder;
@@ -80,24 +80,22 @@ public class AuthController {
     u.setDisplayName(req.displayName());
     if (req.locale() != null) u.setLocale(req.locale());
     users.save(u);
-    audit.record(u.getId(), "USER_REGISTER", http.getRemoteAddr(), http.getHeader("User-Agent"), null);
+    audit.record(
+        u.getId(), "USER_REGISTER", http.getRemoteAddr(), http.getHeader("User-Agent"), null);
     // Cortesia: 1 crédito grátis de criação de currículo por conta nova.
     credits.grantCourtesyIfEligible(u.getId());
     return ResponseEntity.ok(view(u));
   }
 
   @PostMapping("/login")
-  public ResponseEntity<?> login(
-      @Valid @RequestBody LoginRequest req, HttpServletRequest http) {
+  public ResponseEntity<?> login(@Valid @RequestBody LoginRequest req, HttpServletRequest http) {
     String ip = http.getRemoteAddr();
     if (!rateLimit.allow("login:" + ip, 5, Duration.ofMinutes(1))) {
       return ResponseEntity.status(429).build();
     }
 
     User u =
-        users
-            .findByEmailIgnoreCase(req.email())
-            .orElseThrow(() -> new BadCredentialsException());
+        users.findByEmailIgnoreCase(req.email()).orElseThrow(() -> new BadCredentialsException());
 
     if (u.getLockedUntil() != null && u.getLockedUntil().isAfter(java.time.Instant.now())) {
       return ResponseEntity.status(423).build(); // Locked
@@ -109,8 +107,7 @@ public class AuthController {
     // o frontend exiba a mensagem correta ("Use o botao Google").
     if (u.getPasswordHash() == null) {
       audit.record(u.getId(), "LOGIN_OAUTH_ONLY_ATTEMPT", ip, http.getHeader("User-Agent"), null);
-      return ResponseEntity.unprocessableEntity()
-          .body(Map.of("error", "oauth_only"));
+      return ResponseEntity.unprocessableEntity().body(Map.of("error", "oauth_only"));
     }
 
     if (!encoder.matches(req.password(), u.getPasswordHash())) {
@@ -127,7 +124,7 @@ public class AuthController {
     u.setLockedUntil(null);
     users.save(u);
 
-    String access  = jwt.issueAccessToken(u);
+    String access = jwt.issueAccessToken(u);
     String refresh = jwt.issueRefreshToken(u.getId());
 
     audit.record(u.getId(), "LOGIN_SUCCESS", ip, http.getHeader("User-Agent"), null);
@@ -137,15 +134,14 @@ public class AuthController {
   }
 
   /**
-   * Usa o cookie httpOnly de refresh para emitir um novo access token.
-   * Permite restaurar a sessão após F5 ou abertura de nova aba sem pedir login.
+   * Usa o cookie httpOnly de refresh para emitir um novo access token. Permite restaurar a sessão
+   * após F5 ou abertura de nova aba sem pedir login.
    *
-   * <p>Em produção ({@code JWT_PRIVATE_KEY} configurada): o refresh token é um JWT RS256.
-   * Valida assinatura e claim {@code type=refresh} via {@link JwtDecoder} e extrai
-   * o {@code sub} (userId).
+   * <p>Em produção ({@code JWT_PRIVATE_KEY} configurada): o refresh token é um JWT RS256. Valida
+   * assinatura e claim {@code type=refresh} via {@link JwtDecoder} e extrai o {@code sub} (userId).
    *
-   * <p>Em dev local ({@code JwtDecoder} não disponível): aceita o formato legado
-   * {@code STUB_REFRESH.<userId>.<uuid>} sem validação criptográfica.
+   * <p>Em dev local ({@code JwtDecoder} não disponível): aceita o formato legado {@code
+   * STUB_REFRESH.<userId>.<uuid>} sem validação criptográfica.
    */
   @PostMapping("/refresh")
   public ResponseEntity<LoginResponse> refresh(
@@ -188,7 +184,7 @@ public class AuthController {
     User u = users.findById(userId).orElse(null);
     if (u == null) return ResponseEntity.status(401).build();
 
-    String newAccess  = jwt.issueAccessToken(u);
+    String newAccess = jwt.issueAccessToken(u);
     String newRefresh = jwt.issueRefreshToken(userId);
 
     return ResponseEntity.ok()
@@ -241,7 +237,8 @@ public class AuthController {
   }
 
   private UserView view(User u) {
-    return new UserView(u.getId(), u.getEmail(), u.getDisplayName(), u.getRole().name(), u.getLocale());
+    return new UserView(
+        u.getId(), u.getEmail(), u.getDisplayName(), u.getRole().name(), u.getLocale());
   }
 
   @ResponseStatus(org.springframework.http.HttpStatus.UNAUTHORIZED)

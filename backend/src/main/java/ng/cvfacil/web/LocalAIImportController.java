@@ -15,15 +15,12 @@ import org.springframework.web.multipart.MultipartFile;
 /**
  * Endpoint de importação de currículo via IA — ativo somente no profile "local".
  *
- * Idêntico ao AIImportController (mesma lógica em AIImportRequestSupport), mas
- * sem verificação de JWT (LocalSecurityConfig já abre todos os endpoints com
- * .anyRequest().permitAll() em dev local).
+ * <p>Idêntico ao AIImportController (mesma lógica em AIImportRequestSupport), mas sem verificação
+ * de JWT (LocalSecurityConfig já abre todos os endpoints com .anyRequest().permitAll() em dev
+ * local).
  *
- * Para ativar a IA em dev local, adicione em application-local.yml:
- *   cvfacil:
- *     ai:
- *       api-key: "sk-..."     # OpenAI key
- *       model: "gpt-4o-mini"  # ou outro modelo
+ * <p>Para ativar a IA em dev local, adicione em application-local.yml: cvfacil: ai: api-key:
+ * "sk-..." # OpenAI key model: "gpt-4o-mini" # ou outro modelo
  */
 @RestController
 @RequestMapping("/api/ai-import")
@@ -38,7 +35,9 @@ public class LocalAIImportController {
     this.aiImportService = aiImportService;
   }
 
-  @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
+  @PostMapping(
+      consumes = MediaType.MULTIPART_FORM_DATA_VALUE,
+      produces = MediaType.APPLICATION_JSON_VALUE)
   public ResponseEntity<String> importResume(@RequestParam("file") MultipartFile file) {
     return AIImportRequestSupport.handle(aiImportService, file, log, "[AI Import local]");
   }

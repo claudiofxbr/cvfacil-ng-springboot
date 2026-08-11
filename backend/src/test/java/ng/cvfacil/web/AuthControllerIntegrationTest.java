@@ -1,6 +1,8 @@
 package ng.cvfacil.web;
 
 import static org.assertj.core.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.*;
+import static org.mockito.Mockito.*;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
@@ -20,14 +22,11 @@ import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 
-import static org.mockito.ArgumentMatchers.*;
-import static org.mockito.Mockito.*;
-
 /**
  * Testes de integração para AuthController com perfil "local" (EmbeddedPostgres).
  *
- * <p>Redis é mockado via @MockBean — sem necessidade de Docker ou servidor Redis externo.
- * O EmbeddedPostgres do perfil local sobe automaticamente pelo {@code LocalDatabaseConfig}.
+ * <p>Redis é mockado via @MockBean — sem necessidade de Docker ou servidor Redis externo. O
+ * EmbeddedPostgres do perfil local sobe automaticamente pelo {@code LocalDatabaseConfig}.
  */
 @SpringBootTest
 @AutoConfigureMockMvc
@@ -39,8 +38,7 @@ class AuthControllerIntegrationTest {
   @Autowired UserRepository users;
 
   /** Mock do Redis — evita dependência de servidor externo nos testes. */
-  @MockBean
-  StringRedisTemplate redis;
+  @MockBean StringRedisTemplate redis;
 
   @AfterEach
   void cleanup() {
@@ -55,15 +53,17 @@ class AuthControllerIntegrationTest {
   void register_withValidData_returns200AndUserView() throws Exception {
     allowRateLimit();
 
-    var req = Map.of(
-        "email", "inttest@cvfacil.ng",
-        "password", "Senha@Forte123",
-        "displayName", "Teste Int",
-        "locale", "pt-BR");
+    var req =
+        Map.of(
+            "email", "inttest@cvfacil.ng",
+            "password", "Senha@Forte123",
+            "displayName", "Teste Int",
+            "locale", "pt-BR");
 
-    mvc.perform(post("/api/auth/register")
-            .contentType(MediaType.APPLICATION_JSON)
-            .content(mapper.writeValueAsString(req)))
+    mvc.perform(
+            post("/api/auth/register")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(mapper.writeValueAsString(req)))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.email").value("inttest@cvfacil.ng"))
         .andExpect(jsonPath("$.displayName").value("Teste Int"))
@@ -74,32 +74,37 @@ class AuthControllerIntegrationTest {
   void register_duplicateEmail_returns409() throws Exception {
     allowRateLimit();
 
-    var req = Map.of(
-        "email", "inttest@cvfacil.ng",
-        "password", "Senha@Forte123",
-        "displayName", "Dup");
+    var req =
+        Map.of(
+            "email", "inttest@cvfacil.ng",
+            "password", "Senha@Forte123",
+            "displayName", "Dup");
 
-    mvc.perform(post("/api/auth/register")
-            .contentType(MediaType.APPLICATION_JSON)
-            .content(mapper.writeValueAsString(req)))
+    mvc.perform(
+            post("/api/auth/register")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(mapper.writeValueAsString(req)))
         .andExpect(status().isOk());
 
-    mvc.perform(post("/api/auth/register")
-            .contentType(MediaType.APPLICATION_JSON)
-            .content(mapper.writeValueAsString(req)))
+    mvc.perform(
+            post("/api/auth/register")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(mapper.writeValueAsString(req)))
         .andExpect(status().isConflict());
   }
 
   @Test
   void register_weakPassword_returns400() throws Exception {
-    var req = Map.of(
-        "email", "inttest@cvfacil.ng",
-        "password", "curta",   // < 10 chars
-        "displayName", "Teste");
+    var req =
+        Map.of(
+            "email", "inttest@cvfacil.ng",
+            "password", "curta", // < 10 chars
+            "displayName", "Teste");
 
-    mvc.perform(post("/api/auth/register")
-            .contentType(MediaType.APPLICATION_JSON)
-            .content(mapper.writeValueAsString(req)))
+    mvc.perform(
+            post("/api/auth/register")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(mapper.writeValueAsString(req)))
         .andExpect(status().isBadRequest());
   }
 
@@ -111,17 +116,21 @@ class AuthControllerIntegrationTest {
     registerUser("inttest@cvfacil.ng", "Senha@Forte123");
 
     var req = Map.of("email", "inttest@cvfacil.ng", "password", "Senha@Forte123");
-    MvcResult result = mvc.perform(post("/api/auth/login")
-            .contentType(MediaType.APPLICATION_JSON)
-            .content(mapper.writeValueAsString(req)))
-        .andExpect(status().isOk())
-        .andExpect(jsonPath("$.accessToken").isNotEmpty())
-        .andExpect(jsonPath("$.user.email").value("inttest@cvfacil.ng"))
-        .andReturn();
+    MvcResult result =
+        mvc.perform(
+                post("/api/auth/login")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(mapper.writeValueAsString(req)))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.accessToken").isNotEmpty())
+            .andExpect(jsonPath("$.user.email").value("inttest@cvfacil.ng"))
+            .andReturn();
 
-    // Verifica que o cookie de refresh foi emitido
-    String setCookie = result.getResponse().getHeader("Set-Cookie");
-    assertThat(setCookie).contains("refresh_token=");
+    // Verifica que o cookie de refresh foi emitido — a resposta tem DOIS
+    // Set-Cookie (XSRF-TOKEN do filtro CSRF + refresh_token do controller);
+    // getHeader() (singular) só retorna o primeiro, por isso getHeaders() (plural).
+    assertThat(result.getResponse().getHeaders("Set-Cookie"))
+        .anyMatch(c -> c.contains("refresh_token="));
   }
 
   @Test
@@ -130,9 +139,10 @@ class AuthControllerIntegrationTest {
     registerUser("inttest@cvfacil.ng", "Senha@Forte123");
 
     var req = Map.of("email", "inttest@cvfacil.ng", "password", "SenhaErrada999!");
-    mvc.perform(post("/api/auth/login")
-            .contentType(MediaType.APPLICATION_JSON)
-            .content(mapper.writeValueAsString(req)))
+    mvc.perform(
+            post("/api/auth/login")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(mapper.writeValueAsString(req)))
         .andExpect(status().isUnauthorized());
   }
 
@@ -141,9 +151,10 @@ class AuthControllerIntegrationTest {
     allowRateLimit();
 
     var req = Map.of("email", "naoexiste@cvfacil.ng", "password", "Senha@Forte123");
-    mvc.perform(post("/api/auth/login")
-            .contentType(MediaType.APPLICATION_JSON)
-            .content(mapper.writeValueAsString(req)))
+    mvc.perform(
+            post("/api/auth/login")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(mapper.writeValueAsString(req)))
         .andExpect(status().isUnauthorized());
   }
 
@@ -153,9 +164,10 @@ class AuthControllerIntegrationTest {
     when(redis.execute(any(RedisScript.class), anyList(), any(String.class))).thenReturn(6L);
 
     var req = Map.of("email", "inttest@cvfacil.ng", "password", "Senha@Forte123");
-    mvc.perform(post("/api/auth/login")
-            .contentType(MediaType.APPLICATION_JSON)
-            .content(mapper.writeValueAsString(req)))
+    mvc.perform(
+            post("/api/auth/login")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(mapper.writeValueAsString(req)))
         .andExpect(status().isTooManyRequests());
   }
 
@@ -165,11 +177,14 @@ class AuthControllerIntegrationTest {
   void logout_returns204WithExpiredCookie() throws Exception {
     mvc.perform(post("/api/auth/logout"))
         .andExpect(status().isNoContent())
-        .andDo(result -> {
-          String cookie = result.getResponse().getHeader("Set-Cookie");
-          assertThat(cookie).contains("refresh_token=");
-          assertThat(cookie).contains("Max-Age=0");
-        });
+        .andDo(
+            result -> {
+              // Mesmo motivo do teste de login: resposta tem 2 Set-Cookie
+              // (XSRF-TOKEN do filtro CSRF + refresh_token expirado do controller).
+              java.util.List<String> cookies = result.getResponse().getHeaders("Set-Cookie");
+              assertThat(cookies)
+                  .anyMatch(c -> c.contains("refresh_token=") && c.contains("Max-Age=0"));
+            });
   }
 
   // ── /api/auth/forgot-password ─────────────────────────────────────────────
@@ -178,17 +193,19 @@ class AuthControllerIntegrationTest {
   void forgotPassword_alwaysReturns200_toPreventEnumeration() throws Exception {
     // E-mail inexistente deve retornar 200 (previne enumeração de contas)
     var req = Map.of("email", "naoexiste@cvfacil.ng");
-    mvc.perform(post("/api/auth/forgot-password")
-            .contentType(MediaType.APPLICATION_JSON)
-            .content(mapper.writeValueAsString(req)))
+    mvc.perform(
+            post("/api/auth/forgot-password")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(mapper.writeValueAsString(req)))
         .andExpect(status().isOk());
 
     // E-mail existente também deve retornar 200
     registerUser("inttest@cvfacil.ng", "Senha@Forte123");
     var req2 = Map.of("email", "inttest@cvfacil.ng");
-    mvc.perform(post("/api/auth/forgot-password")
-            .contentType(MediaType.APPLICATION_JSON)
-            .content(mapper.writeValueAsString(req2)))
+    mvc.perform(
+            post("/api/auth/forgot-password")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(mapper.writeValueAsString(req2)))
         .andExpect(status().isOk());
   }
 
@@ -202,9 +219,10 @@ class AuthControllerIntegrationTest {
   private void registerUser(String email, String password) throws Exception {
     allowRateLimit();
     var req = Map.of("email", email, "password", password, "displayName", "Teste");
-    mvc.perform(post("/api/auth/register")
-            .contentType(MediaType.APPLICATION_JSON)
-            .content(mapper.writeValueAsString(req)))
+    mvc.perform(
+            post("/api/auth/register")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(mapper.writeValueAsString(req)))
         .andExpect(status().isOk());
   }
 }

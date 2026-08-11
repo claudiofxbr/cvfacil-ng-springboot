@@ -13,20 +13,19 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * AuditLog imutável com encadeamento SHA-256: self_hash = H(prev_hash || payload).
- * Em produção, assinar com HMAC-SHA256 e chave dedicada do KMS (SEC-10).
+ * AuditLog imutável com encadeamento SHA-256: self_hash = H(prev_hash || payload). Em produção,
+ * assinar com HMAC-SHA256 e chave dedicada do KMS (SEC-10).
  *
- * IMPORTANTE: falhas de auditoria nunca devem bloquear a operação principal.
- * O método record() absorve toda exceção e retorna null em caso de erro.
+ * <p>IMPORTANTE: falhas de auditoria nunca devem bloquear a operação principal. O método record()
+ * absorve toda exceção e retorna null em caso de erro.
  *
- * CORREÇÃO (race condition multi-instância): a versão anterior usava apenas
- * `synchronized`, um lock em memória da própria JVM. Em qualquer deploy com
- * mais de uma instância do backend atrás de um load balancer, duas instâncias
- * podiam ler o mesmo `findTopByOrderByIdDesc()` simultaneamente e gravar dois
- * registros com o mesmo prevHash, quebrando a cadeia de auditoria sem erro
- * visível. Agora o serializador é um advisory lock transacional do próprio
- * Postgres (pg_advisory_xact_lock) — funciona entre instâncias e é liberado
- * automaticamente no fim da transação, sem risco de lock órfão.
+ * <p>CORREÇÃO (race condition multi-instância): a versão anterior usava apenas `synchronized`, um
+ * lock em memória da própria JVM. Em qualquer deploy com mais de uma instância do backend atrás de
+ * um load balancer, duas instâncias podiam ler o mesmo `findTopByOrderByIdDesc()` simultaneamente e
+ * gravar dois registros com o mesmo prevHash, quebrando a cadeia de auditoria sem erro visível.
+ * Agora o serializador é um advisory lock transacional do próprio Postgres (pg_advisory_xact_lock)
+ * — funciona entre instâncias e é liberado automaticamente no fim da transação, sem risco de lock
+ * órfão.
  */
 @Service
 public class AuditService {
@@ -45,7 +44,8 @@ public class AuditService {
   }
 
   @Transactional
-  public AuditLog record(UUID userId, String action, String ip, String userAgent, String detailsJson) {
+  public AuditLog record(
+      UUID userId, String action, String ip, String userAgent, String detailsJson) {
     try {
       // Serializa leitura+escrita do último hash entre todas as instâncias do
       // backend. Liberado automaticamente ao fim desta transação.
@@ -68,7 +68,8 @@ public class AuditService {
     } catch (Exception e) {
       // Auditoria é não-crítica: loga o erro mas não propaga para não derrubar
       // o fluxo de login/registro nem incrementar contadores de falha indevidamente.
-      log.error("[audit] Falha ao registrar entrada de auditoria (não crítico): {}", e.getMessage());
+      log.error(
+          "[audit] Falha ao registrar entrada de auditoria (não crítico): {}", e.getMessage());
       return null;
     }
   }

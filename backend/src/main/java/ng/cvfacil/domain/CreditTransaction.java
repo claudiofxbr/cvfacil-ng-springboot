@@ -9,7 +9,12 @@ import java.util.UUID;
 @Table(name = "credit_transactions")
 public class CreditTransaction {
 
-  public enum Type { COURTESY, PURCHASE, ADMIN_GRANT, CONSUMPTION }
+  public enum Type {
+    COURTESY,
+    PURCHASE,
+    ADMIN_GRANT,
+    CONSUMPTION
+  }
 
   @Id
   @GeneratedValue(strategy = GenerationType.UUID)
@@ -35,16 +40,51 @@ public class CreditTransaction {
   @Column(name = "created_at", nullable = false, updatable = false)
   private Instant createdAt = Instant.now();
 
-  public UUID getId() { return id; }
-  public UUID getUserId() { return userId; }
-  public void setUserId(UUID userId) { this.userId = userId; }
-  public Type getType() { return type; }
-  public void setType(Type type) { this.type = type; }
-  public int getAmount() { return amount; }
-  public void setAmount(int amount) { this.amount = amount; }
-  public int getBalanceAfter() { return balanceAfter; }
-  public void setBalanceAfter(int balanceAfter) { this.balanceAfter = balanceAfter; }
-  public String getReference() { return reference; }
-  public void setReference(String reference) { this.reference = reference; }
-  public Instant getCreatedAt() { return createdAt; }
+  public UUID getId() {
+    return id;
+  }
+
+  public UUID getUserId() {
+    return userId;
+  }
+
+  public void setUserId(UUID userId) {
+    this.userId = userId;
+  }
+
+  public Type getType() {
+    return type;
+  }
+
+  public void setType(Type type) {
+    this.type = type;
+  }
+
+  public int getAmount() {
+    return amount;
+  }
+
+  public void setAmount(int amount) {
+    this.amount = amount;
+  }
+
+  public int getBalanceAfter() {
+    return balanceAfter;
+  }
+
+  public void setBalanceAfter(int balanceAfter) {
+    this.balanceAfter = balanceAfter;
+  }
+
+  public String getReference() {
+    return reference;
+  }
+
+  public void setReference(String reference) {
+    this.reference = reference;
+  }
+
+  public Instant getCreatedAt() {
+    return createdAt;
+  }
 }

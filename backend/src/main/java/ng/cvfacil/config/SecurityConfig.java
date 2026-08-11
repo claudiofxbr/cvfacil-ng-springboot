@@ -1,6 +1,5 @@
 package ng.cvfacil.config;
 
-import com.nimbusds.jose.jwk.RSAKey;
 import java.security.KeyFactory;
 import java.security.interfaces.RSAPublicKey;
 import java.security.spec.X509EncodedKeySpec;
@@ -30,21 +29,19 @@ import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
 /**
- * Configuração central de segurança (perfil produção — @Profile("!local")):
- *  - CSRF: double-submit cookie (XSRF-TOKEN)
- *  - CORS: apenas origens configuradas via CORS_ALLOWED_ORIGINS
- *  - Sessões stateless: autenticação via JWT RS256
- *  - OAuth2 Login (Google) + Resource Server (JWT) com JwtDecoder explícito
- *  - BCrypt cost 12
+ * Configuração central de segurança (perfil produção — @Profile("!local")): - CSRF: double-submit
+ * cookie (XSRF-TOKEN) - CORS: apenas origens configuradas via CORS_ALLOWED_ORIGINS - Sessões
+ * stateless: autenticação via JWT RS256 - OAuth2 Login (Google) + Resource Server (JWT) com
+ * JwtDecoder explícito - BCrypt cost 12
  *
- * CORREÇÃO (startup bug): o bloco anterior usava .oauth2ResourceServer(rs -> rs.jwt(jwt -> {}))
- * sem nenhum JwtDecoder bean configurado. Spring Security 6 lança IllegalStateException
- * "No JwtDecoder bean was found" ao construir o SecurityFilterChain, impedindo a inicialização.
- * Agora o JwtDecoder é construído explicitamente a partir de JWT_PUBLIC_KEY (RSA PEM).
+ * <p>CORREÇÃO (startup bug): o bloco anterior usava .oauth2ResourceServer(rs -> rs.jwt(jwt -> {}))
+ * sem nenhum JwtDecoder bean configurado. Spring Security 6 lança IllegalStateException "No
+ * JwtDecoder bean was found" ao construir o SecurityFilterChain, impedindo a inicialização. Agora o
+ * JwtDecoder é construído explicitamente a partir de JWT_PUBLIC_KEY (RSA PEM).
  */
 @Configuration
 @EnableWebSecurity
-@EnableMethodSecurity           // habilita @PreAuthorize / @PostAuthorize em todos os beans
+@EnableMethodSecurity // habilita @PreAuthorize / @PostAuthorize em todos os beans
 @Profile("!local")
 public class SecurityConfig {
 
@@ -80,12 +77,12 @@ public class SecurityConfig {
   /**
    * JwtDecoder RS256 construído a partir da chave pública PEM (JWT_PUBLIC_KEY).
    *
-   * Isso resolve o crash de startup: Spring Security precisa de um JwtDecoder bean
-   * explícito quando .oauth2ResourceServer(rs -> rs.jwt(...)) é chamado sem que
+   * <p>Isso resolve o crash de startup: Spring Security precisa de um JwtDecoder bean explícito
+   * quando .oauth2ResourceServer(rs -> rs.jwt(...)) é chamado sem que
    * spring.security.oauth2.resourceserver.jwt.* esteja configurado no application.yml.
    *
-   * Em produção, JWT_PUBLIC_KEY deve conter a chave pública RS256 correspondente
-   * à chave privada usada em JwtService para assinar os tokens.
+   * <p>Em produção, JWT_PUBLIC_KEY deve conter a chave pública RS256 correspondente à chave privada
+   * usada em JwtService para assinar os tokens.
    */
   @Bean
   public JwtDecoder jwtDecoder() {
@@ -98,14 +95,15 @@ public class SecurityConfig {
     }
     try {
       // Remove cabeçalhos PEM e espaços em branco
-      String stripped = jwtPublicKeyPem
-          .replace("-----BEGIN PUBLIC KEY-----", "")
-          .replace("-----END PUBLIC KEY-----", "")
-          .replaceAll("\\s+", "");
+      String stripped =
+          jwtPublicKeyPem
+              .replace("-----BEGIN PUBLIC KEY-----", "")
+              .replace("-----END PUBLIC KEY-----", "")
+              .replaceAll("\\s+", "");
       byte[] decoded = Base64.getDecoder().decode(stripped);
-      RSAPublicKey publicKey = (RSAPublicKey)
-          KeyFactory.getInstance("RSA")
-                    .generatePublic(new X509EncodedKeySpec(decoded));
+      RSAPublicKey publicKey =
+          (RSAPublicKey)
+              KeyFactory.getInstance("RSA").generatePublic(new X509EncodedKeySpec(decoded));
       return NimbusJwtDecoder.withPublicKey(publicKey).build();
     } catch (Exception e) {
       throw new IllegalStateException(
@@ -114,12 +112,11 @@ public class SecurityConfig {
   }
 
   /**
-   * BUG ENCONTRADO E CORRIGIDO: sem este bean, o Spring Security usa o
-   * conversor default de authorities, que lê o claim "scope"/"scp" — mas
-   * JwtService assina tokens com um claim "role" (USER/ADMIN/ROOT_MASTER),
-   * não "scope". Resultado: toda authority ficava vazia e
-   * .hasAuthority("ROLE_ROOT_MASTER") nunca era concedida a ninguém, mesmo
-   * para o ROOT_MASTER legítimo — /api/admin/** ficava inacessível na prática.
+   * BUG ENCONTRADO E CORRIGIDO: sem este bean, o Spring Security usa o conversor default de
+   * authorities, que lê o claim "scope"/"scp" — mas JwtService assina tokens com um claim "role"
+   * (USER/ADMIN/ROOT_MASTER), não "scope". Resultado: toda authority ficava vazia e
+   * .hasAuthority("ROLE_ROOT_MASTER") nunca era concedida a ninguém, mesmo para o ROOT_MASTER
+   * legítimo — /api/admin/** ficava inacessível na prática.
    */
   @Bean
   public JwtAuthenticationConverter jwtAuthenticationConverter() {
@@ -156,18 +153,22 @@ public class SecurityConfig {
                     .referrerPolicy(
                         rp ->
                             rp.policy(
-                                org.springframework.security.web.header.writers.ReferrerPolicyHeaderWriter
-                                    .ReferrerPolicy.STRICT_ORIGIN_WHEN_CROSS_ORIGIN)))
+                                org.springframework.security.web.header.writers
+                                    .ReferrerPolicyHeaderWriter.ReferrerPolicy
+                                    .STRICT_ORIGIN_WHEN_CROSS_ORIGIN)))
         .authorizeHttpRequests(
             auth ->
-                auth.requestMatchers(HttpMethod.GET, "/actuator/health").permitAll()
-                    .requestMatchers("/api/auth/**", "/oauth2/**", "/login/oauth2/**").permitAll()
+                auth.requestMatchers(HttpMethod.GET, "/actuator/health")
+                    .permitAll()
+                    .requestMatchers("/api/auth/**", "/oauth2/**", "/login/oauth2/**")
+                    .permitAll()
                     // Root e Admin entram no /api/admin/**; as ações restritas ao Root
                     // (excluir usuário, conceder créditos) são checadas dentro do
                     // controller — ver AdminController/AdminService.
                     .requestMatchers("/api/admin/**")
-                        .hasAnyAuthority("ROLE_ADMIN", "ROLE_ROOT_MASTER")
-                    .anyRequest().authenticated())
+                    .hasAnyAuthority("ROLE_ADMIN", "ROLE_ROOT_MASTER")
+                    .anyRequest()
+                    .authenticated())
         .oauth2Login(oauth -> {})
         .oauth2ResourceServer(
             rs -> rs.jwt(jwt -> jwt.jwtAuthenticationConverter(jwtAuthenticationConverter())));

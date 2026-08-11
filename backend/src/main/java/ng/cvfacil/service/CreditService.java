@@ -14,11 +14,10 @@ import org.springframework.transaction.annotation.Transactional;
 /**
  * Créditos de criação de currículo: 1 crédito = 1 currículo criado.
  *
- * Saldo (users.credits) é a leitura rápida; credit_transactions é o ledger
- * append-only para auditoria (mesmo padrão do audit_logs). Toda alteração de
- * saldo passa por um UPDATE atômico (UserRepository) + uma linha no ledger —
- * nunca lê-modifica-escreve o saldo em memória (evita a mesma classe de race
- * condition corrigida no AuditService).
+ * <p>Saldo (users.credits) é a leitura rápida; credit_transactions é o ledger append-only para
+ * auditoria (mesmo padrão do audit_logs). Toda alteração de saldo passa por um UPDATE atômico
+ * (UserRepository) + uma linha no ledger — nunca lê-modifica-escreve o saldo em memória (evita a
+ * mesma classe de race condition corrigida no AuditService).
  */
 @Service
 public class CreditService {
@@ -30,11 +29,11 @@ public class CreditService {
   private final AuditService audit;
 
   /**
-   * NENHUM gateway de pagamento real está integrado ainda (Mercado Pago é o
-   * recomendado no PRD para Pix/boleto/cartão em BRL, mas exige credenciais
-   * reais que este ambiente não tem). Enquanto {@code cvfacil.payment.mercadopago
-   * .access-token} não estiver configurado, /api/credits/purchase responde 501 —
-   * mesmo padrão já usado em AIImportService.isConfigured() para a IA.
+   * NENHUM gateway de pagamento real está integrado ainda (Mercado Pago é o recomendado no PRD para
+   * Pix/boleto/cartão em BRL, mas exige credenciais reais que este ambiente não tem). Enquanto
+   * {@code cvfacil.payment.mercadopago .access-token} não estiver configurado,
+   * /api/credits/purchase responde 501 — mesmo padrão já usado em AIImportService.isConfigured()
+   * para a IA.
    */
   @Value("${cvfacil.payment.mercadopago.access-token:}")
   private String mercadoPagoAccessToken;
@@ -59,11 +58,16 @@ public class CreditService {
 
   /** Concessão manual pelo Root — o controller deve garantir {@code actingRole == ROOT_MASTER}. */
   @Transactional
-  public boolean grantByRoot(UUID actingUserId, User.Role actingRole, UUID targetUserId, int amount) {
+  public boolean grantByRoot(
+      UUID actingUserId, User.Role actingRole, UUID targetUserId, int amount) {
     if (actingRole != User.Role.ROOT_MASTER || amount <= 0) return false;
     if (!users.existsById(targetUserId)) return false;
     grant(targetUserId, amount, CreditTransaction.Type.ADMIN_GRANT, "root:" + actingUserId);
-    audit.record(actingUserId, "ADMIN_GRANT_CREDITS", null, null,
+    audit.record(
+        actingUserId,
+        "ADMIN_GRANT_CREDITS",
+        null,
+        null,
         "target=" + targetUserId + " amount=" + amount);
     return true;
   }
@@ -76,6 +80,7 @@ public class CreditService {
 
   /**
    * Consome 1 crédito para criar um currículo.
+   *
    * @throws InsufficientCreditsException se o saldo for zero.
    */
   @Transactional

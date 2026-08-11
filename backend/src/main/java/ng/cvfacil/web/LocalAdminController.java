@@ -17,11 +17,10 @@ import org.springframework.web.bind.annotation.*;
 /**
  * Versão local de AdminController — ativa apenas em @Profile("local").
  *
- * Diferença vs. produção: STUB tokens não carregam claim "role" (só userId),
- * então o papel é resolvido consultando o usuário no banco — permite testar
- * RBAC em dev sem precisar de JWT_PRIVATE_KEY/JWT_PUBLIC_KEY configurados.
- * LocalSecurityConfig já abre /api/admin/** (permitAll), então a checagem de
- * papel abaixo é a única barreira em dev.
+ * <p>Diferença vs. produção: STUB tokens não carregam claim "role" (só userId), então o papel é
+ * resolvido consultando o usuário no banco — permite testar RBAC em dev sem precisar de
+ * JWT_PRIVATE_KEY/JWT_PUBLIC_KEY configurados. LocalSecurityConfig já abre /api/admin/**
+ * (permitAll), então a checagem de papel abaixo é a única barreira em dev.
  */
 @RestController
 @RequestMapping("/api/admin")

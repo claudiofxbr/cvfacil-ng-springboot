@@ -28,34 +28,29 @@ import org.springframework.stereotype.Service;
 /**
  * Servico de importacao de curriculos via Inteligencia Artificial.
  *
- * PIPELINE:
- *   1. Extracao de texto  -> PDFBox (PDF) | Apache POI (DOCX) | UTF-8 plain (TXT)
- *   2. Fallback OCR       -> Tesseract 5 via tess4j (PDFs escaneados sem camada de texto)
- *   3. Chamada ao LLM     -> OpenAI Chat Completions API  ou  Anthropic Messages API
- *   4. Normalizacao JSON  -> garante schema exato esperado pelo editor do CVFacil.NG
+ * <p>PIPELINE: 1. Extracao de texto -> PDFBox (PDF) | Apache POI (DOCX) | UTF-8 plain (TXT) 2.
+ * Fallback OCR -> Tesseract 5 via tess4j (PDFs escaneados sem camada de texto) 3. Chamada ao LLM ->
+ * OpenAI Chat Completions API ou Anthropic Messages API 4. Normalizacao JSON -> garante schema
+ * exato esperado pelo editor do CVFacil.NG
  *
- * SEGURANCA:
- *   - A API key NUNCA e exposta ao frontend.
- *   - O texto do curriculo e enviado diretamente ao LLM e nao e armazenado.
- *   - Timeout de 90 s; erros de rede retornam excecao controlada.
+ * <p>SEGURANCA: - A API key NUNCA e exposta ao frontend. - O texto do curriculo e enviado
+ * diretamente ao LLM e nao e armazenado. - Timeout de 90 s; erros de rede retornam excecao
+ * controlada.
  *
- * FALLBACK:
- *   - Quando isConfigured() == false, o controller retorna HTTP 501 e o frontend
- *     cai no parser client-side (parseResumeText.js).
+ * <p>FALLBACK: - Quando isConfigured() == false, o controller retorna HTTP 501 e o frontend cai no
+ * parser client-side (parseResumeText.js).
  *
- * OCR (PDFs escaneados):
- *   - Quando PDFBox retorna texto vazio ou muito curto (< 80 chars), o servico
- *     detecta que o PDF nao tem camada de texto e aciona o Tesseract OCR.
- *   - O Tesseract renderiza cada pagina do PDF como imagem (300 DPI) e extrai o texto.
- *   - Requer: cvfacil.ocr.enabled=true + Tesseract 5 instalado no SO.
- *   - Instalacao: Ubuntu -> sudo apt install tesseract-ocr tesseract-ocr-por
- *                 Windows -> https://github.com/UB-Mannheim/tesseract/wiki
- *                 macOS  -> brew install tesseract tesseract-lang
+ * <p>OCR (PDFs escaneados): - Quando PDFBox retorna texto vazio ou muito curto (< 80 chars), o
+ * servico detecta que o PDF nao tem camada de texto e aciona o Tesseract OCR. - O Tesseract
+ * renderiza cada pagina do PDF como imagem (300 DPI) e extrai o texto. - Requer:
+ * cvfacil.ocr.enabled=true + Tesseract 5 instalado no SO. - Instalacao: Ubuntu -> sudo apt install
+ * tesseract-ocr tesseract-ocr-por Windows -> https://github.com/UB-Mannheim/tesseract/wiki macOS ->
+ * brew install tesseract tesseract-lang
  *
- * PROVEDORES SUPORTADOS:
- *   - OpenAI (padrao):   AI_PROVIDER=openai  AI_API_BASE_URL=https://api.openai.com/v1
- *   - Anthropic Claude:  AI_PROVIDER=anthropic  AI_API_BASE_URL=https://api.anthropic.com/v1
- *   - Qualquer provider OpenAI-compatible (Groq, Together, etc.): defina AI_API_BASE_URL.
+ * <p>PROVEDORES SUPORTADOS: - OpenAI (padrao): AI_PROVIDER=openai
+ * AI_API_BASE_URL=https://api.openai.com/v1 - Anthropic Claude: AI_PROVIDER=anthropic
+ * AI_API_BASE_URL=https://api.anthropic.com/v1 - Qualquer provider OpenAI-compatible (Groq,
+ * Together, etc.): defina AI_API_BASE_URL.
  */
 @Service
 public class AIImportService {
@@ -63,52 +58,52 @@ public class AIImportService {
   private static final Logger log = LoggerFactory.getLogger(AIImportService.class);
 
   /**
-   * Limiar minimo de caracteres extraidos pelo PDFBox.
-   * Se o texto extraido tiver menos que este valor (apos trim), o PDF e considerado
-   * escaneado (sem camada de texto) e o OCR e acionado como fallback.
+   * Limiar minimo de caracteres extraidos pelo PDFBox. Se o texto extraido tiver menos que este
+   * valor (apos trim), o PDF e considerado escaneado (sem camada de texto) e o OCR e acionado como
+   * fallback.
    */
   private static final int MIN_TEXT_LENGTH_FOR_SKIP_OCR = 80;
 
   // ── System prompt: instrui o LLM a extrair dados no schema do CVFacil.NG ──
   private static final String SYSTEM_PROMPT =
       "Voce e um parser especializado em curriculos. Analise o texto fornecido e extraia "
-      + "todas as informacoes estruturadas em portugues.\n\n"
-      + "Retorne APENAS um objeto JSON valido, sem markdown, sem explicacoes, sem blocos de codigo.\n\n"
-      + "O JSON deve seguir EXATAMENTE este schema:\n"
-      + "{\n"
-      + "  \"fullName\": \"Nome completo do candidato\",\n"
-      + "  \"headline\": \"Titulo profissional ou cargo atual\",\n"
-      + "  \"email\": \"email@exemplo.com\",\n"
-      + "  \"phone\": \"(XX) XXXXX-XXXX\",\n"
-      + "  \"location\": \"Cidade, Estado\",\n"
-      + "  \"website\": \"URL do LinkedIn ou site pessoal\",\n"
-      + "  \"summary\": \"Paragrafo de resumo profissional (max. 3 linhas)\",\n"
-      + "  \"skills\": [{\"name\": \"Habilidade\", \"pct\": 80}],\n"
-      + "  \"experience\": [{\n"
-      + "    \"role\": \"Cargo\",\n"
-      + "    \"company\": \"Empresa\",\n"
-      + "    \"period\": \"2020 - 2023\",\n"
-      + "    \"bullets\": [\"Responsabilidade 1\", \"Conquista 2\"]\n"
-      + "  }],\n"
-      + "  \"education\": [{\"degree\": \"Bacharelado em...\", \"school\": \"Universidade\", \"period\": \"2016 - 2020\"}],\n"
-      + "  \"languages\": [{\"name\": \"Portugues\", \"level\": \"Nativo\"}],\n"
-      + "  \"hobbies\": [\"Hobby 1\"]\n"
-      + "}\n\n"
-      + "REGRAS OBRIGATORIAS:\n"
-      + "1. Extraia SOMENTE informacoes presentes no texto. NUNCA invente ou assuma dados.\n"
-      + "2. skills[].pct - estime a proficiencia (60-95) pelo contexto:\n"
-      + "   - especialista / avancado / expert -> 88-95\n"
-      + "   - proficiente / solido / bom dominio -> 78-85\n"
-      + "   - intermediario / conhecimento em -> 68-75\n"
-      + "   - basico / familiaridade -> 60-65\n"
-      + "   - nivel nao especificado -> 75\n"
-      + "3. experience[].bullets - extraia responsabilidades/conquistas como array de strings "
-      + "NAO-VAZIAS. Maximo 10 itens por experiencia.\n"
-      + "4. experience[] - ordene do emprego mais RECENTE para o mais antigo.\n"
-      + "5. Campos sem dados: use \"\" (string vazia) ou [] (array vazio). NUNCA use null.\n"
-      + "6. phone - formato brasileiro preferencialmente: (11) 99999-9999.\n"
-      + "7. languages[].level - use exatamente um destes: Nativo, Fluente, Avancado, Intermediario, Basico.\n"
-      + "8. Retorne APENAS o JSON. Nenhum texto antes ou depois.";
+          + "todas as informacoes estruturadas em portugues.\n\n"
+          + "Retorne APENAS um objeto JSON valido, sem markdown, sem explicacoes, sem blocos de codigo.\n\n"
+          + "O JSON deve seguir EXATAMENTE este schema:\n"
+          + "{\n"
+          + "  \"fullName\": \"Nome completo do candidato\",\n"
+          + "  \"headline\": \"Titulo profissional ou cargo atual\",\n"
+          + "  \"email\": \"email@exemplo.com\",\n"
+          + "  \"phone\": \"(XX) XXXXX-XXXX\",\n"
+          + "  \"location\": \"Cidade, Estado\",\n"
+          + "  \"website\": \"URL do LinkedIn ou site pessoal\",\n"
+          + "  \"summary\": \"Paragrafo de resumo profissional (max. 3 linhas)\",\n"
+          + "  \"skills\": [{\"name\": \"Habilidade\", \"pct\": 80}],\n"
+          + "  \"experience\": [{\n"
+          + "    \"role\": \"Cargo\",\n"
+          + "    \"company\": \"Empresa\",\n"
+          + "    \"period\": \"2020 - 2023\",\n"
+          + "    \"bullets\": [\"Responsabilidade 1\", \"Conquista 2\"]\n"
+          + "  }],\n"
+          + "  \"education\": [{\"degree\": \"Bacharelado em...\", \"school\": \"Universidade\", \"period\": \"2016 - 2020\"}],\n"
+          + "  \"languages\": [{\"name\": \"Portugues\", \"level\": \"Nativo\"}],\n"
+          + "  \"hobbies\": [\"Hobby 1\"]\n"
+          + "}\n\n"
+          + "REGRAS OBRIGATORIAS:\n"
+          + "1. Extraia SOMENTE informacoes presentes no texto. NUNCA invente ou assuma dados.\n"
+          + "2. skills[].pct - estime a proficiencia (60-95) pelo contexto:\n"
+          + "   - especialista / avancado / expert -> 88-95\n"
+          + "   - proficiente / solido / bom dominio -> 78-85\n"
+          + "   - intermediario / conhecimento em -> 68-75\n"
+          + "   - basico / familiaridade -> 60-65\n"
+          + "   - nivel nao especificado -> 75\n"
+          + "3. experience[].bullets - extraia responsabilidades/conquistas como array de strings "
+          + "NAO-VAZIAS. Maximo 10 itens por experiencia.\n"
+          + "4. experience[] - ordene do emprego mais RECENTE para o mais antigo.\n"
+          + "5. Campos sem dados: use \"\" (string vazia) ou [] (array vazio). NUNCA use null.\n"
+          + "6. phone - formato brasileiro preferencialmente: (11) 99999-9999.\n"
+          + "7. languages[].level - use exatamente um destes: Nativo, Fluente, Avancado, Intermediario, Basico.\n"
+          + "8. Retorne APENAS o JSON. Nenhum texto antes ou depois.";
 
   // ── Configuracao LLM ────────────────────────────────────────────────────────
   @Value("${cvfacil.ai.provider:openai}")
@@ -125,34 +120,28 @@ public class AIImportService {
 
   // ── Configuracao OCR (Tesseract) ────────────────────────────────────────────
   /**
-   * Habilita o fallback OCR para PDFs escaneados.
-   * Requer Tesseract 5 instalado no sistema operacional.
-   * Padrao: false (OCR desabilitado por seguranca, evitar crash se Tesseract nao estiver instalado).
+   * Habilita o fallback OCR para PDFs escaneados. Requer Tesseract 5 instalado no sistema
+   * operacional. Padrao: false (OCR desabilitado por seguranca, evitar crash se Tesseract nao
+   * estiver instalado).
    */
   @Value("${cvfacil.ocr.enabled:false}")
   private boolean ocrEnabled;
 
   /**
-   * Caminho para o diretorio tessdata do Tesseract.
-   * Vazio = usa o padrao do sistema (funciona quando Tesseract esta no PATH).
-   * Exemplos:
-   *   Linux  : /usr/share/tesseract-ocr/5/tessdata
-   *   Windows: C:/Program Files/Tesseract-OCR/tessdata
-   *   macOS  : /usr/local/share/tessdata
+   * Caminho para o diretorio tessdata do Tesseract. Vazio = usa o padrao do sistema (funciona
+   * quando Tesseract esta no PATH). Exemplos: Linux : /usr/share/tesseract-ocr/5/tessdata Windows:
+   * C:/Program Files/Tesseract-OCR/tessdata macOS : /usr/local/share/tessdata
    */
   @Value("${cvfacil.ocr.tessdata-path:}")
   private String tessdataPath;
 
-  /**
-   * Idiomas do OCR.
-   * "por+eng" = portugues + ingles (recomendado para curriculos brasileiros).
-   */
+  /** Idiomas do OCR. "por+eng" = portugues + ingles (recomendado para curriculos brasileiros). */
   @Value("${cvfacil.ocr.language:por+eng}")
   private String ocrLanguage;
 
   /**
-   * Resolucao (DPI) das imagens geradas pelo PDFBox para o OCR.
-   * 300 DPI e o minimo recomendado. Use 400 para PDFs com fontes muito pequenas.
+   * Resolucao (DPI) das imagens geradas pelo PDFBox para o OCR. 300 DPI e o minimo recomendado. Use
+   * 400 para PDFs com fontes muito pequenas.
    */
   @Value("${cvfacil.ocr.dpi:300}")
   private float ocrDpi;
@@ -178,10 +167,10 @@ public class AIImportService {
   }
 
   /**
-   * Pipeline completo: extrai texto do arquivo e envia ao LLM.
-   * Para PDFs escaneados (sem camada de texto), aciona OCR automaticamente se habilitado.
+   * Pipeline completo: extrai texto do arquivo e envia ao LLM. Para PDFs escaneados (sem camada de
+   * texto), aciona OCR automaticamente se habilitado.
    *
-   * @param content  conteudo binario do arquivo (PDF, DOCX ou TXT)
+   * @param content conteudo binario do arquivo (PDF, DOCX ou TXT)
    * @param filename nome do arquivo (usado para detectar o tipo)
    * @return JSON estruturado do curriculo, pronto para o editor
    */
@@ -190,10 +179,10 @@ public class AIImportService {
     if (rawText.isBlank()) {
       throw new IllegalArgumentException(
           "Nao foi possivel extrair texto do arquivo. "
-          + (filename.toLowerCase().endsWith(".pdf") && !ocrEnabled
-              ? "O PDF pode estar escaneado. Habilite o OCR no servidor (cvfacil.ocr.enabled=true) "
-              + "e instale o Tesseract para processar PDFs escaneados."
-              : "Certifique-se de que o arquivo nao esta protegido por senha ou corrompido."));
+              + (filename.toLowerCase().endsWith(".pdf") && !ocrEnabled
+                  ? "O PDF pode estar escaneado. Habilite o OCR no servidor (cvfacil.ocr.enabled=true) "
+                      + "e instale o Tesseract para processar PDFs escaneados."
+                  : "Certifique-se de que o arquivo nao esta protegido por senha ou corrompido."));
     }
     log.debug("[AI Import] Texto extraido: {} caracteres de '{}'", rawText.length(), filename);
     String aiJson = parseWithAI(rawText);
@@ -203,10 +192,8 @@ public class AIImportService {
   // ── Extracao de texto ───────────────────────────────────────────────────────
 
   /**
-   * Extrai texto puro do arquivo binario.
-   * PDF -> Apache PDFBox  (+ OCR Tesseract como fallback para PDFs escaneados)
-   * DOCX -> Apache POI
-   * TXT -> UTF-8 decode
+   * Extrai texto puro do arquivo binario. PDF -> Apache PDFBox (+ OCR Tesseract como fallback para
+   * PDFs escaneados) DOCX -> Apache POI TXT -> UTF-8 decode
    */
   String extractText(byte[] content, String filename) throws Exception {
     if (filename.endsWith(".pdf")) return extractFromPdf(content);
@@ -217,11 +204,9 @@ public class AIImportService {
   /**
    * Extrai texto de um PDF.
    *
-   * Fluxo:
-   *   1. PDFBox extrai texto da camada de texto digital (rapido, preciso)
-   *   2. Se o texto for muito curto (PDF escaneado sem camada de texto):
-   *      a. Se OCR habilitado: Tesseract renderiza cada pagina como imagem e extrai o texto
-   *      b. Se OCR desabilitado: loga aviso e retorna string vazia
+   * <p>Fluxo: 1. PDFBox extrai texto da camada de texto digital (rapido, preciso) 2. Se o texto for
+   * muito curto (PDF escaneado sem camada de texto): a. Se OCR habilitado: Tesseract renderiza cada
+   * pagina como imagem e extrai o texto b. Se OCR desabilitado: loga aviso e retorna string vazia
    */
   private String extractFromPdf(byte[] content) throws Exception {
     // PDFBox 3.x: Loader.loadPDF(byte[]) substitui PDDocument.load(InputStream)
@@ -246,16 +231,18 @@ public class AIImportService {
       if (ocrEnabled) {
         log.info(
             "[AI Import] PDFBox retornou {} chars — PDF parece escaneado. "
-            + "Acionando OCR (Tesseract, idioma={}, dpi={})",
-            text.length(), ocrLanguage, (int) ocrDpi);
+                + "Acionando OCR (Tesseract, idioma={}, dpi={})",
+            text.length(),
+            ocrLanguage,
+            (int) ocrDpi);
         return extractWithOcr(doc);
       }
 
       // OCR desabilitado e PDF sem texto — logar orientacao clara
       log.warn(
           "[AI Import] PDF sem camada de texto e OCR desabilitado. "
-          + "Para processar PDFs escaneados, habilite cvfacil.ocr.enabled=true "
-          + "e instale Tesseract: sudo apt install tesseract-ocr tesseract-ocr-por");
+              + "Para processar PDFs escaneados, habilite cvfacil.ocr.enabled=true "
+              + "e instale Tesseract: sudo apt install tesseract-ocr tesseract-ocr-por");
       return "";
     }
   }
@@ -263,10 +250,10 @@ public class AIImportService {
   /**
    * Extrai texto de um PDF escaneado via OCR (Tesseract 5).
    *
-   * Cada pagina do PDF e renderizada como imagem em escala de cinza a 300 DPI
-   * e processada pelo Tesseract. O texto de todas as paginas e concatenado.
+   * <p>Cada pagina do PDF e renderizada como imagem em escala de cinza a 300 DPI e processada pelo
+   * Tesseract. O texto de todas as paginas e concatenado.
    *
-   * Requer: Tesseract 5 instalado no SO com os pacotes de idioma configurados.
+   * <p>Requer: Tesseract 5 instalado no SO com os pacotes de idioma configurados.
    */
   private String extractWithOcr(PDDocument doc) throws Exception {
     // Modo headless: essencial para servidores sem display (Linux server)
@@ -279,15 +266,17 @@ public class AIImportService {
     } catch (UnsatisfiedLinkError | ExceptionInInitializerError e) {
       log.error(
           "[AI Import] tess4j nao conseguiu carregar as bibliotecas nativas. "
-          + "Causa: {}. "
-          + "No Windows: as DLLs (libtesseract-5.dll / liblept-5.dll) sao extraidas "
-          + "automaticamente pelo tess4j para um diretorio temporario — isso nao requer "
-          + "instalacao do Tesseract. Verifique se o antivirus nao esta bloqueando a extracao "
-          + "de DLLs de JARs. Caminho tessdata configurado: '{}'",
-          e.getMessage(), tessdataPath.isBlank() ? "(padrao do sistema)" : tessdataPath);
+              + "Causa: {}. "
+              + "No Windows: as DLLs (libtesseract-5.dll / liblept-5.dll) sao extraidas "
+              + "automaticamente pelo tess4j para um diretorio temporario — isso nao requer "
+              + "instalacao do Tesseract. Verifique se o antivirus nao esta bloqueando a extracao "
+              + "de DLLs de JARs. Caminho tessdata configurado: '{}'",
+          e.getMessage(),
+          tessdataPath.isBlank() ? "(padrao do sistema)" : tessdataPath);
       throw new IllegalStateException(
           "OCR indisponivel: falha ao carregar bibliotecas nativas do Tesseract. "
-          + "Verifique os logs do servidor para detalhes.", e);
+              + "Verifique os logs do servidor para detalhes.",
+          e);
     }
 
     // Definir caminho do tessdata (usa padrao do sistema se nao configurado)
@@ -295,7 +284,7 @@ public class AIImportService {
       tesseract.setDatapath(tessdataPath);
     }
     tesseract.setLanguage(ocrLanguage);
-    tesseract.setPageSegMode(3);  // PSM_AUTO — segmentacao automatica de pagina
+    tesseract.setPageSegMode(3); // PSM_AUTO — segmentacao automatica de pagina
     tesseract.setOcrEngineMode(1); // OEM_LSTM_ONLY — rede neural (mais preciso)
 
     PDFRenderer renderer = new PDFRenderer(doc);
@@ -308,7 +297,11 @@ public class AIImportService {
       try {
         img = renderer.renderImageWithDPI(i, ocrDpi, ImageType.GRAY);
       } catch (Exception renderEx) {
-        log.warn("[AI Import] Falha ao renderizar pagina {}/{}: {}", i + 1, pages, renderEx.getMessage());
+        log.warn(
+            "[AI Import] Falha ao renderizar pagina {}/{}: {}",
+            i + 1,
+            pages,
+            renderEx.getMessage());
         continue;
       }
 
@@ -319,25 +312,31 @@ public class AIImportService {
         }
         log.debug(
             "[AI Import] OCR pagina {}/{}: {} chars extraidos",
-            i + 1, pages, pageText != null ? pageText.trim().length() : 0);
+            i + 1,
+            pages,
+            pageText != null ? pageText.trim().length() : 0);
       } catch (TesseractException e) {
         log.warn("[AI Import] OCR falhou na pagina {}/{}: {}", i + 1, pages, e.getMessage());
         // Continua para as proximas paginas mesmo se uma falhar
       } catch (UnsatisfiedLinkError | ExceptionInInitializerError e) {
         // Erro de DLL durante OCR (raro — geralmente ocorre na inicializacao do Tesseract acima)
-        log.error("[AI Import] Erro de biblioteca nativa durante OCR na pagina {}: {}", i + 1, e.getMessage());
+        log.error(
+            "[AI Import] Erro de biblioteca nativa durante OCR na pagina {}: {}",
+            i + 1,
+            e.getMessage());
         throw new IllegalStateException("OCR interrompido: falha de biblioteca nativa.", e);
       }
     }
 
     String result = sb.toString().trim();
-    log.info("[AI Import] OCR concluido: {} chars extraidos de {} pagina(s)", result.length(), pages);
+    log.info(
+        "[AI Import] OCR concluido: {} chars extraidos de {} pagina(s)", result.length(), pages);
     return result;
   }
 
   private String extractFromDocx(byte[] content) throws Exception {
     try (XWPFDocument doc = new XWPFDocument(new ByteArrayInputStream(content));
-         XWPFWordExtractor extractor = new XWPFWordExtractor(doc)) {
+        XWPFWordExtractor extractor = new XWPFWordExtractor(doc)) {
       return extractor.getText();
     }
   }
@@ -345,13 +344,15 @@ public class AIImportService {
   // ── Chamada ao LLM ──────────────────────────────────────────────────────────
 
   /**
-   * Envia o texto ao LLM configurado e retorna o JSON bruto da resposta.
-   * Suporta OpenAI (padrao) e Anthropic.
+   * Envia o texto ao LLM configurado e retorna o JSON bruto da resposta. Suporta OpenAI (padrao) e
+   * Anthropic.
    */
   String parseWithAI(String rawText) throws Exception {
     // Limita o texto a ~16 000 caracteres para nao exceder o contexto do modelo
     String truncated = rawText.length() > 16_000 ? rawText.substring(0, 16_000) : rawText;
-    return "anthropic".equalsIgnoreCase(provider) ? callAnthropic(truncated) : callOpenAI(truncated);
+    return "anthropic".equalsIgnoreCase(provider)
+        ? callAnthropic(truncated)
+        : callOpenAI(truncated);
   }
 
   private String callOpenAI(String text) throws Exception {
@@ -382,8 +383,9 @@ public class AIImportService {
     if (response.statusCode() != 200) {
       log.error("[AI Import] OpenAI retornou HTTP {}: {}", response.statusCode(), response.body());
       throw new RuntimeException(
-          "Erro na API OpenAI (HTTP " + response.statusCode()
-          + "). Verifique a API key e o modelo configurado.");
+          "Erro na API OpenAI (HTTP "
+              + response.statusCode()
+              + "). Verifique a API key e o modelo configurado.");
     }
 
     return mapper.readTree(response.body()).at("/choices/0/message/content").asText();
@@ -413,10 +415,12 @@ public class AIImportService {
     HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
 
     if (response.statusCode() != 200) {
-      log.error("[AI Import] Anthropic retornou HTTP {}: {}", response.statusCode(), response.body());
+      log.error(
+          "[AI Import] Anthropic retornou HTTP {}: {}", response.statusCode(), response.body());
       throw new RuntimeException(
-          "Erro na API Anthropic (HTTP " + response.statusCode()
-          + "). Verifique a API key e o modelo configurado.");
+          "Erro na API Anthropic (HTTP "
+              + response.statusCode()
+              + "). Verifique a API key e o modelo configurado.");
     }
 
     return mapper.readTree(response.body()).at("/content/0/text").asText();
@@ -427,24 +431,24 @@ public class AIImportService {
   /**
    * Normaliza a resposta do LLM para corresponder EXATAMENTE ao schema do editor.
    *
-   * Garante:
-   *  - Campo "photo" presente (string vazia - foto nao e extraida de texto)
-   *  - experience[].bullets com exatamente 10 elementos (preenchidos com "" quando necessario)
-   *  - Nenhum campo null (substituido por "" ou [])
+   * <p>Garante: - Campo "photo" presente (string vazia - foto nao e extraida de texto) -
+   * experience[].bullets com exatamente 10 elementos (preenchidos com "" quando necessario) -
+   * Nenhum campo null (substituido por "" ou [])
    */
   String normalizeResumeJson(String aiJson) throws Exception {
     // Extrai o JSON mesmo que o LLM tenha incluido markdown fences
     String cleaned = aiJson.strip();
     if (cleaned.startsWith("```")) {
       int start = cleaned.indexOf('\n') + 1;
-      int end   = cleaned.lastIndexOf("```");
+      int end = cleaned.lastIndexOf("```");
       if (end > start) cleaned = cleaned.substring(start, end).strip();
     }
 
     ObjectNode root = (ObjectNode) mapper.readTree(cleaned);
 
     // Campos de topo: garantir que nao sejam null
-    for (String field : new String[]{"fullName", "headline", "email", "phone", "location", "website", "summary"}) {
+    for (String field :
+        new String[] {"fullName", "headline", "email", "phone", "location", "website", "summary"}) {
       if (!root.has(field) || root.get(field).isNull()) root.put(field, "");
     }
     if (!root.has("photo") || root.get("photo").isNull()) root.put("photo", "");
@@ -465,9 +469,9 @@ public class AIImportService {
     }
     for (var entry : root.withArray("experience")) {
       ObjectNode exp = (ObjectNode) entry;
-      if (!exp.has("role")    || exp.get("role").isNull())    exp.put("role", "");
+      if (!exp.has("role") || exp.get("role").isNull()) exp.put("role", "");
       if (!exp.has("company") || exp.get("company").isNull()) exp.put("company", "");
-      if (!exp.has("period")  || exp.get("period").isNull())  exp.put("period", "");
+      if (!exp.has("period") || exp.get("period").isNull()) exp.put("period", "");
 
       ArrayNode bullets = mapper.createArrayNode();
       if (exp.has("bullets") && !exp.get("bullets").isNull()) {
@@ -498,7 +502,7 @@ public class AIImportService {
     }
     for (var lang : root.withArray("languages")) {
       ObjectNode l = (ObjectNode) lang;
-      if (!l.has("name")  || l.get("name").isNull())  l.put("name", "");
+      if (!l.has("name") || l.get("name").isNull()) l.put("name", "");
       if (!l.has("level") || l.get("level").isNull()) l.put("level", "");
     }
 

@@ -1,9 +1,9 @@
 package ng.cvfacil.web;
 
-import java.util.List;
-import java.util.UUID;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Min;
+import java.util.List;
+import java.util.UUID;
 import ng.cvfacil.domain.User;
 import ng.cvfacil.service.AdminService;
 import ng.cvfacil.service.CreditService;
@@ -14,12 +14,11 @@ import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.*;
 
 /**
- * Endpoints administrativos — ativo apenas em produção (@Profile("!local")).
- * O filtro de segurança (SecurityConfig) já exige ROLE_ADMIN ou ROLE_ROOT_MASTER
- * para qualquer rota sob /api/admin/**; aqui só distinguimos as ações
- * exclusivas do Root (excluir usuário) das demais (Admin + Root).
+ * Endpoints administrativos — ativo apenas em produção (@Profile("!local")). O filtro de segurança
+ * (SecurityConfig) já exige ROLE_ADMIN ou ROLE_ROOT_MASTER para qualquer rota sob /api/admin/**;
+ * aqui só distinguimos as ações exclusivas do Root (excluir usuário) das demais (Admin + Root).
  *
- * Em produção, este controller é servido em subdomínio admin.cvfacil.ng (PRD §4.4).
+ * <p>Em produção, este controller é servido em subdomínio admin.cvfacil.ng (PRD §4.4).
  */
 @RestController
 @RequestMapping("/api/admin")

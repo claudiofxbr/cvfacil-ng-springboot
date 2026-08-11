@@ -21,13 +21,12 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Fluxo de "esqueci minha senha" — antes AuthController.forgotPassword() retornava
- * 200 sem gerar token nem enviar e-mail (TODO explícito, ver commit anterior).
+ * Fluxo de "esqueci minha senha" — antes AuthController.forgotPassword() retornava 200 sem gerar
+ * token nem enviar e-mail (TODO explícito, ver commit anterior).
  *
- * Token de reset: 32 bytes aleatórios (SecureRandom), enviado por e-mail em claro;
- * só o SHA-256 do token é persistido (mesmo princípio de nunca guardar segredos
- * em claro usado para password_hash/mfa_secret). Expira em 30 minutos e é
- * de uso único (usedAt).
+ * <p>Token de reset: 32 bytes aleatórios (SecureRandom), enviado por e-mail em claro; só o SHA-256
+ * do token é persistido (mesmo princípio de nunca guardar segredos em claro usado para
+ * password_hash/mfa_secret). Expira em 30 minutos e é de uso único (usedAt).
  */
 @Service
 public class PasswordResetService {
@@ -61,31 +60,38 @@ public class PasswordResetService {
   }
 
   /**
-   * Sempre "silencioso" do ponto de vista do chamador — não revela se o e-mail
-   * existe nem se é uma conta OAuth-only (o AuthController sempre responde 200).
+   * Sempre "silencioso" do ponto de vista do chamador — não revela se o e-mail existe nem se é uma
+   * conta OAuth-only (o AuthController sempre responde 200).
    */
   @Transactional
   public void requestReset(String email) {
-    users.findByEmailIgnoreCase(email).ifPresent(user -> {
-      if (user.getPasswordHash() == null) {
-        // Conta OAuth-only: não tem senha local para redefinir.
-        return;
-      }
-      String rawToken = generateToken();
-      PasswordResetToken entity = new PasswordResetToken();
-      entity.setUserId(user.getId());
-      entity.setTokenHash(sha256Hex(rawToken));
-      entity.setExpiresAt(Instant.now().plus(TOKEN_TTL));
-      tokens.save(entity);
-      sendResetEmail(user.getEmail(), rawToken);
-    });
+    users
+        .findByEmailIgnoreCase(email)
+        .ifPresent(
+            user -> {
+              if (user.getPasswordHash() == null) {
+                // Conta OAuth-only: não tem senha local para redefinir.
+                return;
+              }
+              String rawToken = generateToken();
+              PasswordResetToken entity = new PasswordResetToken();
+              entity.setUserId(user.getId());
+              entity.setTokenHash(sha256Hex(rawToken));
+              entity.setExpiresAt(Instant.now().plus(TOKEN_TTL));
+              tokens.save(entity);
+              sendResetEmail(user.getEmail(), rawToken);
+            });
   }
 
-  /** @return true se a senha foi redefinida; false se o token é inválido/expirado/já usado. */
+  /**
+   * @return true se a senha foi redefinida; false se o token é inválido/expirado/já usado.
+   */
   @Transactional
   public boolean resetPassword(String rawToken, String newPassword) {
     PasswordResetToken entity = tokens.findByTokenHash(sha256Hex(rawToken)).orElse(null);
-    if (entity == null || entity.getUsedAt() != null || entity.getExpiresAt().isBefore(Instant.now())) {
+    if (entity == null
+        || entity.getUsedAt() != null
+        || entity.getExpiresAt().isBefore(Instant.now())) {
       return false;
     }
     User user = users.findById(entity.getUserId()).orElse(null);

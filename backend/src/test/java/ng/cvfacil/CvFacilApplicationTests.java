@@ -2,9 +2,7 @@ package ng.cvfacil;
 
 import org.junit.jupiter.api.Test;
 
-/**
- * Smoke test mínimo. Testes de integração reais exigem perfis e Testcontainers.
- */
+/** Smoke test mínimo. Testes de integração reais exigem perfis e Testcontainers. */
 class CvFacilApplicationTests {
 
   @Test
