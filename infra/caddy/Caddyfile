@@ -1,0 +1,26 @@
+{
+	email claudio.xavier@gmail.com
+	auto_https disable_redirects
+}
+
+xavierbr-vps.tech:8443 {
+	tls {
+		dns hostinger {env.HOSTINGER_API_TOKEN}
+	}
+	reverse_proxy localhost:3002
+	encode gzip
+}
+
+cvfacil-ng.xavierbr-vps.tech:8443 {
+	tls {
+		dns_ttl 60s
+		dns hostinger {env.HOSTINGER_API_TOKEN}
+	}
+	handle /api/* {
+		reverse_proxy localhost:8095
+	}
+	handle {
+		reverse_proxy localhost:3012
+	}
+	encode gzip
+}
