@@ -19,6 +19,12 @@ cvfacil-ng.xavierbr-vps.tech:8443 {
 	handle /api/* {
 		reverse_proxy localhost:8095
 	}
+	handle /oauth2/* {
+		reverse_proxy localhost:8095
+	}
+	handle /login/oauth2/* {
+		reverse_proxy localhost:8095
+	}
 	handle {
 		reverse_proxy localhost:3012
 	}
