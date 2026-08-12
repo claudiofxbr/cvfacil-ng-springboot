@@ -465,14 +465,35 @@ public class AIImportService {
             .POST(HttpRequest.BodyPublishers.ofString(mapper.writeValueAsString(body)))
             .build();
 
-    HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
-
-    if (response.statusCode() != 200) {
-      log.error("[AI Import] Gemini retornou HTTP {}: {}", response.statusCode(), response.body());
-      throw new RuntimeException(
-          "Erro na API Gemini (HTTP "
-              + response.statusCode()
-              + "). Verifique a API key e o modelo configurado.");
+    // Gemini free-tier retorna 503 "UNAVAILABLE" (modelo sobrecarregado) e 429 "RESOURCE_EXHAUSTED"
+    // com frequencia — a propria Google recomenda retry. Sem isso, qualquer pico de demanda no lado
+    // deles derruba a importacao mesmo com chave/modelo corretos.
+    int maxAttempts = 3;
+    HttpResponse<String> response = null;
+    for (int attempt = 1; attempt <= maxAttempts; attempt++) {
+      response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+      int status = response.statusCode();
+      if (status == 200) break;
+      boolean transient_ = status == 503 || status == 429;
+      if (!transient_ || attempt == maxAttempts) {
+        log.error("[AI Import] Gemini retornou HTTP {}: {}", status, response.body());
+        throw new RuntimeException(
+            transient_
+                ? "O modelo Gemini esta temporariamente sobrecarregado. Tente novamente em instantes."
+                : "Erro na API Gemini (HTTP " + status + "). Verifique a API key e o modelo configurado.");
+      }
+      log.warn(
+          "[AI Import] Gemini retornou HTTP {} (tentativa {}/{}) — retentando em {}ms",
+          status,
+          attempt,
+          maxAttempts,
+          1000L << (attempt - 1));
+      try {
+        Thread.sleep(1000L << (attempt - 1)); // 1s, 2s
+      } catch (InterruptedException e) {
+        Thread.currentThread().interrupt();
+        throw new RuntimeException("Importacao interrompida.", e);
+      }
     }
 
     return mapper
