@@ -124,7 +124,6 @@ jobs:
         uses: gitleaks/gitleaks-action@v2
         with:
           config-path: .gitleaks.toml
-        continue-on-error: true
 
       - name: Trivy (dependências do repositório)
         uses: aquasecurity/trivy-action@0.24.0
