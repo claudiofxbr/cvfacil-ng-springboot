@@ -1,8 +1,12 @@
 name: Deploy — Hostinger
 
 on:
-  push:
+  # So dispara apos o workflow CI (ci.yml) terminar em main — deploy nunca
+  # roda com testes/lint/security scan quebrados ou ainda em andamento.
+  workflow_run:
+    workflows: ["CI"]
     branches: [main]
+    types: [completed]
   workflow_dispatch: {}
 
 concurrency:
@@ -13,8 +17,14 @@ jobs:
   deploy:
     name: Sync + build + cutover na VPS
     runs-on: ubuntu-latest
+    # workflow_dispatch (manual) sempre roda; via workflow_run, só se o CI passou.
+    if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          # No trigger workflow_run, GITHUB_SHA aponta pro HEAD atual de main,
+          # não pro commit que o CI validou — precisa fixar o ref explicitamente.
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
 
       - name: Setup SSH
         env:
