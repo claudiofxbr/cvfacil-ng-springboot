@@ -1,94 +1,63 @@
 name: Deploy — Hostinger
 
 on:
-  workflow_dispatch:
-    inputs:
-      environment:
-        description: 'Ambiente de deploy'
-        required: true
-        default: 'staging'
-        type: choice
-        options: [staging, production]
   push:
     branches: [main]
+  workflow_dispatch: {}
 
 concurrency:
-  group: deploy-${{ github.event.inputs.environment || 'production' }}
+  group: deploy-production
   cancel-in-progress: false
 
 jobs:
-  build-and-deploy:
-    name: Build + Deploy (blue/green)
+  deploy:
+    name: Sync + build + cutover na VPS
     runs-on: ubuntu-latest
-    environment: ${{ github.event.inputs.environment || 'production' }}
     steps:
       - uses: actions/checkout@v4
 
-      # ----- Frontend -----
-      - name: Setup Node
-        uses: actions/setup-node@v4
-        with: { node-version: '20', cache: 'npm', cache-dependency-path: frontend/package-lock.json }
-
-      - name: Build frontend (standalone)
-        working-directory: frontend
+      - name: Setup SSH
         env:
-          NEXT_PUBLIC_API_BASE_URL: ${{ secrets.FRONTEND_API_BASE_URL }}
-          NEXT_PUBLIC_GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_OAUTH_CLIENT_ID }}
+          SSH_KEY: ${{ secrets.HOSTINGER_SSH_KEY }}
+          SSH_HOST: ${{ secrets.HOSTINGER_SSH_HOST }}
         run: |
-          npm ci
-          npm run build
+          mkdir -p ~/.ssh
+          echo "$SSH_KEY" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          ssh-keyscan -H "$SSH_HOST" >> ~/.ssh/known_hosts
 
-      # ----- Backend -----
-      - name: Setup JDK 21
-        uses: actions/setup-java@v4
-        with: { distribution: 'temurin', java-version: '21', cache: 'maven' }
-
-      - name: Package backend
-        working-directory: backend
-        run: mvn -B -DskipTests package
-
-      # ----- Hash + SBOM -----
-      - name: Compute artifact hashes
-        run: |
-          cd backend/target && sha256sum *.jar > sha256.txt
-          cat sha256.txt
-
-      # ----- Deploy via SSH -----
-      - name: Deploy to Hostinger (blue/green)
+      # Envia o codigo-fonte (sem segredos — DATABASE_PASSWORD, JWT_*, AI_API_KEY
+      # etc. ficam SOMENTE na VPS, nunca passam pelo GitHub Actions) para uma
+      # pasta de build isolada. O deploy real reaproveita as env vars ja
+      # configuradas nos containers em producao (ver ci_deploy.py).
+      - name: Sync source to VPS build dir
         env:
-          SSH_KEY:        ${{ secrets.HOSTINGER_SSH_KEY }}
-          SSH_HOST:       ${{ secrets.HOSTINGER_SSH_HOST }}
-          SSH_USER:       ${{ secrets.HOSTINGER_SSH_USER }}
-          AI_API_KEY:     ${{ secrets.AI_API_KEY }}
-          JWT_PRIVATE:    ${{ secrets.JWT_PRIVATE_KEY }}
-          JWT_PUBLIC:     ${{ secrets.JWT_PUBLIC_KEY }}
-          DATABASE_URL:   ${{ secrets.DATABASE_URL }}
-          DB_USER:        ${{ secrets.DATABASE_USERNAME }}
-          DB_PASS:        ${{ secrets.DATABASE_PASSWORD }}
+          SSH_USER: ${{ secrets.HOSTINGER_SSH_USER }}
+          SSH_HOST: ${{ secrets.HOSTINGER_SSH_HOST }}
         run: |
-          mkdir -p ~/.ssh && echo "$SSH_KEY" > ~/.ssh/id_ed25519 && chmod 600 ~/.ssh/id_ed25519
-          ssh-keyscan "$SSH_HOST" >> ~/.ssh/known_hosts
+          tar --exclude='backend/target' --exclude='frontend/node_modules' \
+              --exclude='frontend/.next' --exclude='.git' \
+              -czf - backend frontend | \
+          ssh "$SSH_USER@$SSH_HOST" \
+            "rm -rf /root/cvfacil-build/backend /root/cvfacil-build/frontend && \
+             mkdir -p /root/cvfacil-build && cd /root/cvfacil-build && tar -xzf -"
 
-          rsync -az --delete --checksum \
-            frontend/.next/standalone/ \
-            "$SSH_USER@$SSH_HOST:/opt/cvfacil/green/frontend/"
+      - name: Build + cutover (backend e frontend)
+        env:
+          SSH_USER: ${{ secrets.HOSTINGER_SSH_USER }}
+          SSH_HOST: ${{ secrets.HOSTINGER_SSH_HOST }}
+        run: |
+          ssh "$SSH_USER@$SSH_HOST" \
+            "python3 /root/cvfacil-sb/ci_deploy.py ${GITHUB_SHA::7}"
 
-          rsync -az --delete --checksum \
-            backend/target/*.jar \
-            "$SSH_USER@$SSH_HOST:/opt/cvfacil/green/backend/"
-
-          ssh "$SSH_USER@$SSH_HOST" bash <<EOF
-            set -e
-            export AI_API_KEY='$AI_API_KEY'
-            export JWT_PRIVATE_KEY='$JWT_PRIVATE'
-            export JWT_PUBLIC_KEY='$JWT_PUBLIC'
-            export DATABASE_URL='$DATABASE_URL'
-            export DATABASE_USERNAME='$DB_USER'
-            export DATABASE_PASSWORD='$DB_PASS'
-            /opt/cvfacil/scripts/switch-color.sh green
-            /opt/cvfacil/scripts/healthcheck.sh || /opt/cvfacil/scripts/switch-color.sh blue
-          EOF
+      - name: Healthcheck pos-deploy
+        env:
+          SSH_USER: ${{ secrets.HOSTINGER_SSH_USER }}
+          SSH_HOST: ${{ secrets.HOSTINGER_SSH_HOST }}
+        run: |
+          ssh "$SSH_USER@$SSH_HOST" \
+            "curl -sf -o /dev/null https://cvfacil-ng.xavierbr-vps.tech:8443/login && echo 'site OK'"
 
       - name: Notify on failure
         if: failure()
-        run: echo "::error::Deploy falhou. Rollback automático executado."
+        run: echo "::error::Deploy falhou. ci_deploy.py reverte automaticamente cada servico que falhar ao subir."
