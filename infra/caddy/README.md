@@ -70,3 +70,37 @@ Enquanto `GOOGLE_OAUTH_CLIENT_ID`/`GOOGLE_OAUTH_CLIENT_SECRET` no
 (`disabled-client.apps.googleusercontent.com` / `disabled-secret`), o botão
 "Entrar com Google" redireciona ao Google mas a autenticação real falha —
 só funciona após configurar credenciais reais.
+
+## Bug corrigido: porta `:8443` faltando em 3 variáveis
+
+O Caddy escuta esse subdomínio na porta `8443` (não na `443` padrão — a
+`443`/`80` já são usadas pelo `nginx` da VPS para outros vhosts). No
+primeiro deploy com o domínio HTTPS, três variáveis foram configuradas
+**sem** a porta:
+
+- `NEXT_PUBLIC_API_BASE_URL` (build-arg do frontend, baked-in no bundle JS)
+- `CORS_ALLOWED_ORIGINS` / `JWT_ISSUER` / `FRONTEND_BASE_URL` (env do backend)
+
+Efeito em cascata:
+1. O frontend chamava a API em `https://cvfacil-ng.xavierbr-vps.tech`
+   (porta 443 implícita) em vez de `:8443`.
+2. Como o `nginx` não tem `server_name` para esse subdomínio, a requisição
+   caía no vhost "default" dele — que por coincidência é **outro app
+   Spring Boot completamente diferente**, hospedado na mesma VPS
+   (`cvfacil.xavierbr-vps.tech`, proxy para `localhost:7777`). Esse app
+   respondeu com um erro de validação genérico só que de outro código-fonte
+   — confundindo o diagnóstico (parecia erro de cadastro duplicado/erro
+   aleatório, mas nem chegava a tocar no backend certo).
+3. Mesmo corrigindo só a URL, `CORS_ALLOWED_ORIGINS` sem a porta bloquearia
+   a resposta no navegador (`curl` não detecta isso — CORS é aplicado só
+   pelo navegador, por isso os testes via `curl` "passavam" enquanto o
+   registro real pela UI falhava).
+
+**Corrigido**: as 4 variáveis passaram a incluir `:8443` explicitamente.
+Confirmado end-to-end via navegador real (não só `curl`): cadastro e login
+funcionando em `https://cvfacil-ng.xavierbr-vps.tech:8443`.
+
+**Lição para reproduzir esse deploy em outra porta/domínio no futuro**:
+sempre incluir a porta em TODAS as URLs absolutas passadas ao app quando
+ela não for a 80/443 padrão — inconsistência entre elas quebra CORS e/ou
+gera roteamento cruzado silencioso para outro serviço na mesma VPS.
