@@ -721,12 +721,26 @@ function ImportTab({ router }) {
             className="w-full rounded-md border border-gray-300 p-3 text-xs font-mono focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500 mb-3"
             rows={8}
             value={rawText}
-            onChange={(e) => {
-              setRawText(e.target.value);
-              if (e.target.value.trim()) setStatus('extracted');
-            }}
+            onChange={(e) => setRawText(e.target.value)}
             placeholder="Cole aqui o texto do seu currículo..."
           />
+          <button
+            type="button"
+            disabled={!rawText.trim()}
+            onClick={() => {
+              // BUG CORRIGIDO: antes o onChange ja marcava status='extracted' ao digitar,
+              // pulando direto para o fallback local sem nunca chamar a IA — a mensagem
+              // "IA indisponivel" aparecia mesmo sem a IA ter sido tentada. Agora o texto
+              // colado passa pelo mesmo pipeline tryAIImport() do upload de arquivo.
+              const file = new File([rawText], 'colado.txt', { type: 'text/plain' });
+              setFileName(file.name);
+              setFileObj(file);
+              tryAIImport(file);
+            }}
+            className="btn-primary flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            <Sparkles size={16} /> Importar com IA
+          </button>
         </div>
       )}
     </div>
