@@ -227,7 +227,7 @@ export default function LoginPage() {
               <span className="h-px flex-1 bg-gray-200" />
             </div>
 
-            <form onSubmit={onSubmit} className="space-y-4" noValidate>
+            <form onSubmit={onSubmit} className="space-y-4" noValidate autoComplete="off">
               <div>
                 <label htmlFor="email" className="mb-1 block text-sm font-medium text-gray-700">
                   E-mail
@@ -235,7 +235,7 @@ export default function LoginPage() {
                 <input
                   id="email"
                   type="email"
-                  autoComplete="email"
+                  autoComplete="off"
                   required
                   value={form.email}
                   onChange={(e) => setForm({ ...form, email: e.target.value })}
@@ -249,7 +249,9 @@ export default function LoginPage() {
                 <input
                   id="password"
                   type="password"
-                  autoComplete="current-password"
+                  // "new-password" (nao "off") e o unico valor que navegadores Chrome/Edge/Firefox
+                  // realmente respeitam para nao oferecer preencher/salvar senha de login existente.
+                  autoComplete="new-password"
                   required
                   value={form.password}
                   onChange={(e) => setForm({ ...form, password: e.target.value })}
