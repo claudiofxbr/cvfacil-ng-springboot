@@ -10,6 +10,8 @@ Uso: python3 ci_deploy.py <git-sha-curto>
 import json
 import subprocess
 import sys
+import time
+import urllib.request
 
 
 def run(cmd, **kw):
@@ -21,8 +23,22 @@ def run_ok(cmd, **kw):
     return subprocess.run(cmd, capture_output=True, text=True, **kw)
 
 
+def wait_healthy(url, attempts=10, delay=3):
+    """Poll url ate responder 200. Da tempo pro app subir (JVM/Next.js) antes
+    de decidir que o deploy falhou de verdade."""
+    for attempt in range(1, attempts + 1):
+        try:
+            with urllib.request.urlopen(url, timeout=3) as resp:
+                if resp.status == 200:
+                    return True
+        except Exception as exc:
+            print(f"  healthcheck {url} tentativa {attempt}/{attempts}: {exc}")
+        time.sleep(delay)
+    return False
+
+
 def deploy_service(name, image_tag, dockerfile_dir, container_name, port_map,
-                    extra_build_args=None):
+                    health_url, extra_build_args=None):
     build_cmd = ["docker", "build", "-t", image_tag]
     for arg in (extra_build_args or []):
         build_cmd += ["--build-arg", arg]
@@ -47,8 +63,17 @@ def deploy_service(name, image_tag, dockerfile_dir, container_name, port_map,
     cmd.append(image_tag)
 
     result = run_ok(cmd)
-    if result.returncode != 0:
-        print(f"FALHOU o run de {name}: {result.stderr}")
+    started = result.returncode == 0
+    # O "docker run" so garante que o container iniciou — nao que a app
+    # responde de verdade (ex: erro de config, migracao pendente). Por isso
+    # o rollback so e considerado seguro apos o healthcheck HTTP passar.
+    healthy = started and wait_healthy(health_url)
+
+    if not started or not healthy:
+        motivo = "docker run falhou" if not started else f"healthcheck {health_url} nao respondeu 200"
+        print(f"FALHOU o deploy de {name}: {motivo}")
+        if not started:
+            print(result.stderr)
         print(f"Revertendo {name} para a versao anterior...")
         run_ok(["docker", "stop", container_name])
         run_ok(["docker", "rm", "-f", container_name])
@@ -68,6 +93,7 @@ def main():
         "/root/cvfacil-build/backend",
         "cvfacil-sb-backend",
         "8095:8080",
+        health_url="http://localhost:8095/actuator/health",
     )
 
     deploy_service(
@@ -76,8 +102,12 @@ def main():
         "/root/cvfacil-build/frontend",
         "cvfacil-sb-frontend",
         "3012:3000",
+        health_url="http://localhost:3012/login",
         extra_build_args=["NEXT_PUBLIC_API_BASE_URL=https://cvfacil-ng.xavierbr-vps.tech:8443"],
     )
+
+    # Evita acumulo indefinido de imagens antigas (uma nova tag por deploy).
+    run_ok(["docker", "image", "prune", "-f"])
 
 
 if __name__ == "__main__":
