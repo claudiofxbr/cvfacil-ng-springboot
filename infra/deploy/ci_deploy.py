@@ -74,6 +74,14 @@ def deploy_service(name, image_tag, dockerfile_dir, container_name, port_map,
         print(f"FALHOU o deploy de {name}: {motivo}")
         if not started:
             print(result.stderr)
+        else:
+            # Sem isso, o motivo do crash (stack trace, erro de bean, etc.) se perde
+            # assim que o container e removido no rollback abaixo.
+            logs = run_ok(["docker", "logs", "--tail", "200", container_name])
+            print(f"--- docker logs {container_name} (ultimas 200 linhas, stdout) ---")
+            print(logs.stdout)
+            print(f"--- docker logs {container_name} (ultimas 200 linhas, stderr) ---")
+            print(logs.stderr)
         print(f"Revertendo {name} para a versao anterior...")
         run_ok(["docker", "stop", container_name])
         run_ok(["docker", "rm", "-f", container_name])
