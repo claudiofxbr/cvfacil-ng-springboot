@@ -432,7 +432,8 @@ public class AIImportService {
     // acesso restrito); o alias "gemini-flash-latest" resolve para o Flash vigente
     // e funciona para qualquer chave — usado como fallback mais seguro.
     String effectiveModel = model.isBlank() ? "gemini-flash-latest" : model;
-    // base-url deve apontar para a raiz da API (ex.: https://generativelanguage.googleapis.com/v1beta),
+    // base-url deve apontar para a raiz da API (ex.:
+    // https://generativelanguage.googleapis.com/v1beta),
     // sem o segmento /models/{model}:generateContent — este metodo o monta.
     String url = baseUrl.replaceAll("/+$", "") + "/models/" + effectiveModel + ":generateContent";
 
@@ -443,7 +444,8 @@ public class AIImportService {
 
     ObjectNode systemInstruction = mapper.createObjectNode();
     systemInstruction.set(
-        "parts", mapper.createArrayNode().add(mapper.createObjectNode().put("text", SYSTEM_PROMPT)));
+        "parts",
+        mapper.createArrayNode().add(mapper.createObjectNode().put("text", SYSTEM_PROMPT)));
 
     ObjectNode generationConfig = mapper.createObjectNode();
     generationConfig.put("temperature", 0.1);
@@ -480,7 +482,9 @@ public class AIImportService {
         throw new RuntimeException(
             transient_
                 ? "O modelo Gemini esta temporariamente sobrecarregado. Tente novamente em instantes."
-                : "Erro na API Gemini (HTTP " + status + "). Verifique a API key e o modelo configurado.");
+                : "Erro na API Gemini (HTTP "
+                    + status
+                    + "). Verifique a API key e o modelo configurado.");
       }
       log.warn(
           "[AI Import] Gemini retornou HTTP {} (tentativa {}/{}) — retentando em {}ms",
