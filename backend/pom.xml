@@ -7,7 +7,9 @@
     <parent>
         <groupId>org.springframework.boot</groupId>
         <artifactId>spring-boot-starter-parent</artifactId>
-        <version>3.3.2</version>
+        <!-- 3.5.12: corrige CVE-2026-22733 (bypass de autenticacao no Actuator sob
+             endpoints CloudFoundry) -->
+        <version>3.5.12</version>
         <relativePath/>
     </parent>
 
@@ -68,6 +70,8 @@
         <dependency>
             <groupId>org.postgresql</groupId>
             <artifactId>postgresql</artifactId>
+            <!-- 42.7.11: corrige CVE-2026-42198 (DoS via SCRAM-SHA-256 malicioso) -->
+            <version>42.7.11</version>
             <scope>runtime</scope>
         </dependency>
         <dependency>
@@ -101,7 +105,8 @@
         <dependency>
             <groupId>com.googlecode.owasp-java-html-sanitizer</groupId>
             <artifactId>owasp-java-html-sanitizer</artifactId>
-            <version>20240325.1</version>
+            <!-- 20260101.1: corrige CVE-2025-66021 (XSS) -->
+            <version>20260101.1</version>
         </dependency>
 
         <!-- HIBP k-anonymity (HTTP client usa HttpClient padrão) -->
