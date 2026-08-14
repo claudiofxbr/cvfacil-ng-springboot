@@ -70,8 +70,9 @@
         <dependency>
             <groupId>org.postgresql</groupId>
             <artifactId>postgresql</artifactId>
-            <!-- 42.7.11: corrige CVE-2026-42198 (DoS via SCRAM-SHA-256 malicioso) -->
-            <version>42.7.11</version>
+            <!-- 42.7.12: corrige CVE-2026-42198 (DoS via SCRAM-SHA-256 malicioso) e
+                 CVE-2026-54291 (bypass de protecao MITM via downgrade SCRAM-SHA-256-PLUS) -->
+            <version>42.7.12</version>
             <scope>runtime</scope>
         </dependency>
         <dependency>
