@@ -262,32 +262,44 @@ public class AuthController {
       } catch (Exception ignored) {
       }
     }
-    String auth = request.getHeader("Authorization");
-    if (auth != null && auth.startsWith("Bearer STUB_ACCESS.")) {
-      String[] parts = auth.substring("Bearer ".length()).split("\\.", 3);
-      if (parts.length >= 2) {
-        try {
-          return UUID.fromString(parts[1]);
-        } catch (Exception ignored) {
+    // STUB só é aceito quando não há JwtDecoder real (profile "local") — em qualquer outro
+    // profile, um STUB_ACCESS forjado pelo cliente nunca deve autenticar (ver decodeTypedToken).
+    if (jwtDecoder == null) {
+      String auth = request.getHeader("Authorization");
+      if (auth != null && auth.startsWith("Bearer STUB_ACCESS.")) {
+        String[] parts = auth.substring("Bearer ".length()).split("\\.", 3);
+        if (parts.length >= 2) {
+          try {
+            return UUID.fromString(parts[1]);
+          } catch (Exception ignored) {
+          }
         }
       }
     }
     return null;
   }
 
-  /** Decodifica um token com claim "type", aceitando o formato STUB legado em dev local. */
+  /**
+   * Decodifica um token com claim "type". O formato STUB legado só é aceito quando {@code
+   * jwtDecoder} é nulo (profile "local", sem resource server configurado) — checar o prefixo
+   * antes do profile permitiria que qualquer cliente forjasse "STUB_MFA.<uuid>.x"/"STUB_REFRESH.
+   * <uuid>.x" para autenticar como qualquer usuário em produção, pulando MFA e o allowlist de IP
+   * do Root.
+   */
   private UUID decodeTypedToken(String token, String stubPrefix, String expectedType) {
     if (token == null || token.isBlank()) return null;
-    if (token.startsWith(stubPrefix)) {
-      String[] parts = token.split("\\.", 3);
-      if (parts.length < 3) return null;
-      try {
-        return UUID.fromString(parts[1]);
-      } catch (IllegalArgumentException e) {
-        return null;
+    if (jwtDecoder == null) {
+      if (token.startsWith(stubPrefix)) {
+        String[] parts = token.split("\\.", 3);
+        if (parts.length < 3) return null;
+        try {
+          return UUID.fromString(parts[1]);
+        } catch (IllegalArgumentException e) {
+          return null;
+        }
       }
+      return null;
     }
-    if (jwtDecoder == null) return null;
     try {
       Jwt decoded = jwtDecoder.decode(token);
       if (!expectedType.equals(decoded.getClaimAsString("type"))) return null;
