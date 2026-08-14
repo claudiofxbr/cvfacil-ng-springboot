@@ -68,7 +68,8 @@ class OAuth2LoginSuccessHandlerTest {
     if (email != null) attrs.put("email", email);
     if (name != null) attrs.put("name", name);
     return new DefaultOAuth2User(
-        java.util.List.of(new org.springframework.security.core.authority.SimpleGrantedAuthority("ROLE_USER")),
+        java.util.List.of(
+            new org.springframework.security.core.authority.SimpleGrantedAuthority("ROLE_USER")),
         attrs,
         "sub");
   }

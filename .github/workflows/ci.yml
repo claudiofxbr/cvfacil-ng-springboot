@@ -111,6 +111,11 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          # Gitleaks precisa diffar contra o commit anterior (base^..head); com o
+          # fetch-depth:1 padrao esse commit nao existe no clone e o scan falha
+          # ("unknown revision or path not in the working tree").
+          fetch-depth: 0
 
       - name: Gitleaks
         uses: gitleaks/gitleaks-action@v2
