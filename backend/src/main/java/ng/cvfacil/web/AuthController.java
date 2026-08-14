@@ -281,10 +281,10 @@ public class AuthController {
 
   /**
    * Decodifica um token com claim "type". O formato STUB legado só é aceito quando {@code
-   * jwtDecoder} é nulo (profile "local", sem resource server configurado) — checar o prefixo
-   * antes do profile permitiria que qualquer cliente forjasse "STUB_MFA.<uuid>.x"/"STUB_REFRESH.
-   * <uuid>.x" para autenticar como qualquer usuário em produção, pulando MFA e o allowlist de IP
-   * do Root.
+   * jwtDecoder} é nulo (profile "local", sem resource server configurado) — checar o prefixo antes
+   * do profile permitiria que qualquer cliente forjasse "STUB_MFA.<uuid>.x"/"STUB_REFRESH.
+   * <uuid>.x" para autenticar como qualquer usuário em produção, pulando MFA e o allowlist de IP do
+   * Root.
    */
   private UUID decodeTypedToken(String token, String stubPrefix, String expectedType) {
     if (token == null || token.isBlank()) return null;

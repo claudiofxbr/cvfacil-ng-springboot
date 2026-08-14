@@ -26,7 +26,9 @@ public class RootIpAllowlistService {
   }
 
   public boolean isAllowed(String remoteIp) {
-    long total = ((Number) em.createNativeQuery("SELECT count(*) FROM root_ip_allowlist").getSingleResult()).longValue();
+    long total =
+        ((Number) em.createNativeQuery("SELECT count(*) FROM root_ip_allowlist").getSingleResult())
+            .longValue();
     if (total == 0) return true;
     if (remoteIp == null || remoteIp.isBlank()) return false;
     long matches =

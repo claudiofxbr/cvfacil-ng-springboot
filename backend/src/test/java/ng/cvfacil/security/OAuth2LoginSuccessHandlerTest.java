@@ -23,9 +23,9 @@ import org.springframework.security.oauth2.core.user.OAuth2User;
 import org.springframework.test.util.ReflectionTestUtils;
 
 /**
- * Testes unitários para OAuth2LoginSuccessHandler — cobre provisionamento de usuário novo,
- * promoção de emailVerified para conta pré-existente (bug corrigido nesta sessão), fallback de
- * displayName, ausência de e-mail e case-insensitivity do lookup por e-mail.
+ * Testes unitários para OAuth2LoginSuccessHandler — cobre provisionamento de usuário novo, promoção
+ * de emailVerified para conta pré-existente (bug corrigido nesta sessão), fallback de displayName,
+ * ausência de e-mail e case-insensitivity do lookup por e-mail.
  */
 class OAuth2LoginSuccessHandlerTest {
 
