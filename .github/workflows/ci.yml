@@ -102,23 +102,15 @@ jobs:
           path: backend/target/*.jar
 
   # ---------- SECURITY ----------
+  # CodeQL removido: repo e privado e "Advanced security has not been purchased"
+  # (GHAS e pago para privados). Sem ele, o job falhava sempre — nem chegava a
+  # rodar Gitleaks/Trivy, que continuam cobrindo segredo vazado e dependencia
+  # vulneravel sem depender de licenca nenhuma.
   security:
     name: Security — SAST + Dependency Check
     runs-on: ubuntu-latest
-    permissions:
-      security-events: write
-      actions: read
-      contents: read
     steps:
       - uses: actions/checkout@v4
-
-      - name: CodeQL init
-        uses: github/codeql-action/init@v3
-        with:
-          languages: javascript,java
-
-      - name: CodeQL analyze
-        uses: github/codeql-action/analyze@v3
 
       - name: Gitleaks
         uses: gitleaks/gitleaks-action@v2
