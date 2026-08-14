@@ -500,10 +500,7 @@ public class AIImportService {
       }
     }
 
-    return mapper
-        .readTree(response.body())
-        .at("/candidates/0/content/parts/0/text")
-        .asText();
+    return mapper.readTree(response.body()).at("/candidates/0/content/parts/0/text").asText();
   }
 
   // ── Normalizacao do JSON ────────────────────────────────────────────────────

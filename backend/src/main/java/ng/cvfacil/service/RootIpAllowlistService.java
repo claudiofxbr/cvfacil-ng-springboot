@@ -4,9 +4,9 @@ import jakarta.persistence.EntityManager;
 import org.springframework.stereotype.Service;
 
 /**
- * Allowlist de IP para login do RootMaster (PRD §4.4). A tabela {@code root_ip_allowlist} já
- * existe desde V1__init.sql (coluna {@code cidr}, tipo nativo CIDR do Postgres) mas nunca tinha
- * sido lida por nenhum código até agora.
+ * Allowlist de IP para login do RootMaster (PRD §4.4). A tabela {@code root_ip_allowlist} já existe
+ * desde V1__init.sql (coluna {@code cidr}, tipo nativo CIDR do Postgres) mas nunca tinha sido lida
+ * por nenhum código até agora.
  *
  * <p>Consultada via query nativa (não como {@code @Entity} JPA): mapear uma coluna CIDR como String
  * quebraria a validação de schema do Hibernate ({@code ddl-auto=validate}), que espera o tipo Java

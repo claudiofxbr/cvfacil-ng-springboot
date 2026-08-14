@@ -14,14 +14,14 @@ import org.springframework.transaction.annotation.Transactional;
  * CVFacil.NG.
  *
  * <p>So promove contas com {@code emailVerified == true} — esse flag hoje so e setado por {@link
- * ng.cvfacil.security.OAuth2LoginSuccessHandler} apos o Google confirmar a posse do email. Sem
- * essa checagem, qualquer pessoa poderia se cadastrar localmente com esse email (o registro por
- * senha nao verifica posse de caixa de entrada) e ganhar ROOT_MASTER — checar emailVerified fecha
- * esse vetor de escalonamento de privilegio, sem exigir um fluxo novo de verificacao de email.
+ * ng.cvfacil.security.OAuth2LoginSuccessHandler} apos o Google confirmar a posse do email. Sem essa
+ * checagem, qualquer pessoa poderia se cadastrar localmente com esse email (o registro por senha
+ * nao verifica posse de caixa de entrada) e ganhar ROOT_MASTER — checar emailVerified fecha esse
+ * vetor de escalonamento de privilegio, sem exigir um fluxo novo de verificacao de email.
  *
  * <p>Ativo apenas fora do profile local (decisao de escopo: a regra vale para producao). Rodando
- * como job periodico (nao a cada request) para nao pagar o custo de uma query extra por
- * requisicao autenticada.
+ * como job periodico (nao a cada request) para nao pagar o custo de uma query extra por requisicao
+ * autenticada.
  */
 @Service
 @Profile("!local")
