@@ -91,6 +91,11 @@ jobs:
           DATABASE_USERNAME: cvfacil_app
           DATABASE_PASSWORD: cvfacil_pwd
           REDIS_URL: redis://localhost:6379
+          # application.yml registra o client OAuth "google" mesmo com o id vazio, e o
+          # OAuth2ClientAutoConfiguration do Spring recusa subir o contexto nesse caso
+          # ("Client id must not be empty") — valores dummy bastam pro contexto de teste.
+          GOOGLE_OAUTH_CLIENT_ID: test-client-id
+          GOOGLE_OAUTH_CLIENT_SECRET: test-client-secret
 
       - name: Package (fat JAR)
         run: mvn -B -DskipTests package
