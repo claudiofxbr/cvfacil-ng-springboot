@@ -17,9 +17,9 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
- * Autoatendimento LGPD Art. 18 / GDPR Art. 15-20 — o próprio titular exportando ou apagando os
- * seus dados. userId vem exclusivamente do JWT validado, nunca de parâmetro de rota — não é
- * possível exportar/apagar a conta de outra pessoa por aqui (isso é AdminController).
+ * Autoatendimento LGPD Art. 18 / GDPR Art. 15-20 — o próprio titular exportando ou apagando os seus
+ * dados. userId vem exclusivamente do JWT validado, nunca de parâmetro de rota — não é possível
+ * exportar/apagar a conta de outra pessoa por aqui (isso é AdminController).
  */
 @RestController
 @RequestMapping("/api/users/me")
@@ -36,10 +36,7 @@ public class PrivacyController {
   public ResponseEntity<?> export(@AuthenticationPrincipal Jwt principal) {
     UUID userId = resolveUserId(principal);
     if (userId == null) return ResponseEntity.status(401).build();
-    return service
-        .export(userId)
-        .map(ResponseEntity::ok)
-        .orElse(ResponseEntity.notFound().build());
+    return service.export(userId).map(ResponseEntity::ok).orElse(ResponseEntity.notFound().build());
   }
 
   @DeleteMapping
@@ -61,10 +58,7 @@ public class PrivacyController {
       case WRONG_PASSWORD -> ResponseEntity.status(401).body(Map.of("error", "Senha incorreta"));
       case ROOT_MASTER_BLOCKED ->
           ResponseEntity.status(409)
-              .body(
-                  Map.of(
-                      "error",
-                      "Contas Root não podem se autoexcluir. Transfira o papel antes."));
+              .body(Map.of("error", "Contas Root não podem se autoexcluir. Transfira o papel antes."));
     };
   }
 

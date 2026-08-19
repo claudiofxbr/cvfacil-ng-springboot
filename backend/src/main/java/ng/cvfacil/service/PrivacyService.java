@@ -14,8 +14,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Autoatendimento LGPD Art. 18 / GDPR Art. 15-20 — acesso, portabilidade e eliminação dos dados do
- * próprio titular (diferente de AdminService.deleteUser, que é um Root/Admin apagando OUTRA
- * conta).
+ * próprio titular (diferente de AdminService.deleteUser, que é um Root/Admin apagando OUTRA conta).
  */
 @Service
 public class PrivacyService {
