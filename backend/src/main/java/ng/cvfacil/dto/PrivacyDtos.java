@@ -6,8 +6,8 @@ import java.util.UUID;
 import ng.cvfacil.dto.ResumeDtos.ResumeView;
 
 /**
- * DTOs do autoatendimento LGPD Art. 18 / GDPR Art. 15-20 (acesso, portabilidade e eliminação) —
- * ver PrivacyController/PrivacyService.
+ * DTOs do autoatendimento LGPD Art. 18 / GDPR Art. 15-20 (acesso, portabilidade e eliminação) — ver
+ * PrivacyController/PrivacyService.
  */
 public class PrivacyDtos {
 

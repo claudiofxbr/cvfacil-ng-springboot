@@ -58,7 +58,9 @@ public class PrivacyController {
       case WRONG_PASSWORD -> ResponseEntity.status(401).body(Map.of("error", "Senha incorreta"));
       case ROOT_MASTER_BLOCKED ->
           ResponseEntity.status(409)
-              .body(Map.of("error", "Contas Root não podem se autoexcluir. Transfira o papel antes."));
+              .body(
+                  Map.of(
+                      "error", "Contas Root não podem se autoexcluir. Transfira o papel antes."));
     };
   }
 
