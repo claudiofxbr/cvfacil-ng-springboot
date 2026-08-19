@@ -39,6 +39,11 @@ services:
       SMTP_HOST: ${SMTP_HOST:-}
       SMTP_USERNAME: ${SMTP_USERNAME:-}
       SMTP_PASSWORD: ${SMTP_PASSWORD:-}
+      # Sem SMTP configurado (padrao acima), o indicador de mail do Actuator fica
+      # DOWN e derruba o /actuator/health agregado usado no healthcheck abaixo,
+      # mesmo com a aplicacao 100% funcional. Desligado por padrao; setar para
+      # "true" no .env se SMTP_* forem configurados de verdade.
+      MANAGEMENT_HEALTH_MAIL_ENABLED: ${MANAGEMENT_HEALTH_MAIL_ENABLED:-false}
     ports:
       - "8080:8080"
     depends_on:
