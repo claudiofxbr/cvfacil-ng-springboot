@@ -63,13 +63,14 @@ public class AdminService {
   }
 
   /**
-   * Exportação dos dados de um usuário por um Admin/Root — mesma visão que o próprio titular
-   * obtém via PrivacyService.export (LGPD Art. 18), mas disparada por quem tem acesso ao painel
-   * admin (ex.: atender solicitação do titular por outro canal). Disponível para ADMIN e
-   * ROOT_MASTER (mesmo nível de listUsers); fica registrado em audit_logs por envolver dados
-   * pessoais de terceiros.
+   * Exportação dos dados de um usuário por um Admin/Root — mesma visão que o próprio titular obtém
+   * via PrivacyService.export (LGPD Art. 18), mas disparada por quem tem acesso ao painel admin
+   * (ex.: atender solicitação do titular por outro canal). Disponível para ADMIN e ROOT_MASTER
+   * (mesmo nível de listUsers); fica registrado em audit_logs por envolver dados pessoais de
+   * terceiros.
    */
-  public Optional<UserExport> exportUser(UUID actingUserId, User.Role actingRole, UUID targetUserId) {
+  public Optional<UserExport> exportUser(
+      UUID actingUserId, User.Role actingRole, UUID targetUserId) {
     if (actingRole != User.Role.ADMIN && actingRole != User.Role.ROOT_MASTER) {
       return Optional.empty();
     }
