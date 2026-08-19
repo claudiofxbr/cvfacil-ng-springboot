@@ -5,6 +5,8 @@ import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.UUID;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import ng.cvfacil.domain.AuditLog;
 import ng.cvfacil.repository.AuditLogRepository;
 import org.slf4j.Logger;
@@ -35,6 +37,14 @@ public class AuditService {
   /** Chave arbitrária e estável para o advisory lock da cadeia de auditoria. */
   private static final long AUDIT_CHAIN_LOCK_KEY = 7_326_192_84L;
 
+  /**
+   * E-mail dentro de detailsJson: mascara a parte local, mantendo o domínio (ex.:
+   * ana.silva@gmail.com vira a***@gmail.com) — LGPD Art. 6/III (minimização): o registro continua
+   * útil para investigação sem expor o dado pessoal em texto puro.
+   */
+  private static final Pattern EMAIL_PATTERN =
+      Pattern.compile("([a-zA-Z0-9._%+-])[a-zA-Z0-9._%+-]*(@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,})");
+
   private final AuditLogRepository repo;
   private final EntityManager entityManager;
 
@@ -56,14 +66,15 @@ public class AuditService {
 
       AuditLog last = repo.findTopByOrderByIdDesc();
       String prev = last == null ? "" : last.getSelfHash();
+      String masked = maskPii(detailsJson);
       AuditLog entry = new AuditLog();
       entry.setUserId(userId);
       entry.setAction(action);
       entry.setIp(ip);
       entry.setUserAgent(userAgent);
-      entry.setDetailsJson(detailsJson);
+      entry.setDetailsJson(masked);
       entry.setPrevHash(prev);
-      entry.setSelfHash(sha256(prev + "|" + action + "|" + userId + "|" + detailsJson));
+      entry.setSelfHash(sha256(prev + "|" + action + "|" + userId + "|" + masked));
       return repo.save(entry);
     } catch (Exception e) {
       // Auditoria é não-crítica: loga o erro mas não propaga para não derrubar
@@ -72,6 +83,16 @@ public class AuditService {
           "[audit] Falha ao registrar entrada de auditoria (não crítico): {}", e.getMessage());
       return null;
     }
+  }
+
+  /**
+   * Aplica em detailsJson antes de gravar/hashear — ver EMAIL_PATTERN. Ponto único de defesa: um
+   * chamador futuro de record() não precisa lembrar de mascarar e-mail manualmente.
+   */
+  private String maskPii(String detailsJson) {
+    if (detailsJson == null || detailsJson.isBlank()) return detailsJson;
+    Matcher m = EMAIL_PATTERN.matcher(detailsJson);
+    return m.replaceAll("$1***$2");
   }
 
   private String sha256(String input) {
