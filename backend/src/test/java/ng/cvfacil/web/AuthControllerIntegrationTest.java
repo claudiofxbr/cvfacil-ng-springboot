@@ -222,15 +222,7 @@ class AuthControllerIntegrationTest {
   private void registerUser(String email, String password) throws Exception {
     allowRateLimit();
     var req =
-        Map.of(
-            "email",
-            email,
-            "password",
-            password,
-            "displayName",
-            "Teste",
-            "termsAccepted",
-            true);
+        Map.of("email", email, "password", password, "displayName", "Teste", "termsAccepted", true);
     mvc.perform(
             post("/api/auth/register")
                 .contentType(MediaType.APPLICATION_JSON)
