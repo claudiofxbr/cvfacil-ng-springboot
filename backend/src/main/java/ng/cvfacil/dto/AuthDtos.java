@@ -1,5 +1,6 @@
 package ng.cvfacil.dto;
 
+import jakarta.validation.constraints.AssertTrue;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Pattern;
@@ -20,7 +21,9 @@ public class AuthDtos {
               message = "Senha deve incluir maiúsculas, minúsculas, dígitos e símbolos")
           String password,
       String displayName,
-      @Pattern(regexp = "pt-BR|en-US|es-ES") String locale) {}
+      @Pattern(regexp = "pt-BR|en-US|es-ES") String locale,
+      @AssertTrue(message = "É necessário aceitar os Termos de Uso e a Política de Privacidade")
+          boolean termsAccepted) {}
 
   public record ForgotPasswordRequest(@Email @NotBlank String email) {}
 

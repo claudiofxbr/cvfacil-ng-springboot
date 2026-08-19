@@ -69,6 +69,13 @@ public class User {
   @Column(name = "password_changed_at", nullable = false)
   private Instant passwordChangedAt = Instant.now();
 
+  /** LGPD Art. 8 / GDPR Art. 7 — quando o titular aceitou os Termos/Política vigentes. */
+  @Column(name = "terms_accepted_at")
+  private Instant termsAcceptedAt;
+
+  @Column(name = "terms_version", length = 20)
+  private String termsVersion;
+
   @Column(name = "created_at", nullable = false, updatable = false)
   private Instant createdAt = Instant.now();
 
@@ -179,6 +186,22 @@ public class User {
 
   public void setPasswordChangedAt(Instant t) {
     this.passwordChangedAt = t;
+  }
+
+  public Instant getTermsAcceptedAt() {
+    return termsAcceptedAt;
+  }
+
+  public void setTermsAcceptedAt(Instant t) {
+    this.termsAcceptedAt = t;
+  }
+
+  public String getTermsVersion() {
+    return termsVersion;
+  }
+
+  public void setTermsVersion(String v) {
+    this.termsVersion = v;
   }
 
   public Instant getCreatedAt() {

@@ -58,7 +58,8 @@ class AuthControllerIntegrationTest {
             "email", "inttest@cvfacil.ng",
             "password", "Senha@Forte123",
             "displayName", "Teste Int",
-            "locale", "pt-BR");
+            "locale", "pt-BR",
+            "termsAccepted", true);
 
     mvc.perform(
             post("/api/auth/register")
@@ -78,7 +79,8 @@ class AuthControllerIntegrationTest {
         Map.of(
             "email", "inttest@cvfacil.ng",
             "password", "Senha@Forte123",
-            "displayName", "Dup");
+            "displayName", "Dup",
+            "termsAccepted", true);
 
     mvc.perform(
             post("/api/auth/register")
@@ -99,7 +101,8 @@ class AuthControllerIntegrationTest {
         Map.of(
             "email", "inttest@cvfacil.ng",
             "password", "curta", // < 10 chars
-            "displayName", "Teste");
+            "displayName", "Teste",
+            "termsAccepted", true);
 
     mvc.perform(
             post("/api/auth/register")
@@ -218,7 +221,9 @@ class AuthControllerIntegrationTest {
 
   private void registerUser(String email, String password) throws Exception {
     allowRateLimit();
-    var req = Map.of("email", email, "password", password, "displayName", "Teste");
+    var req =
+        Map.of(
+            "email", email, "password", password, "displayName", "Teste", "termsAccepted", true);
     mvc.perform(
             post("/api/auth/register")
                 .contentType(MediaType.APPLICATION_JSON)

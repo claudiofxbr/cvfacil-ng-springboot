@@ -86,6 +86,13 @@ public class AuthController {
     this.ipAllowlist = ipAllowlist;
   }
 
+  /**
+   * Versao vigente dos Termos de Uso/Politica de Privacidade — LGPD Art. 8 / GDPR Art. 7 exigem
+   * que o consentimento seja rastreavel a um documento especifico. Incrementar ao publicar uma
+   * nova versao dos termos (contas antigas mantem o registro do que aceitaram na epoca).
+   */
+  private static final String TERMS_VERSION = "1.0";
+
   @PostMapping("/register")
   public ResponseEntity<UserView> register(
       @Valid @RequestBody RegisterRequest req, HttpServletRequest http) {
@@ -97,9 +104,15 @@ public class AuthController {
     u.setPasswordHash(encoder.encode(req.password()));
     u.setDisplayName(req.displayName());
     if (req.locale() != null) u.setLocale(req.locale());
+    u.setTermsAcceptedAt(java.time.Instant.now());
+    u.setTermsVersion(TERMS_VERSION);
     users.save(u);
     audit.record(
-        u.getId(), "USER_REGISTER", http.getRemoteAddr(), http.getHeader("User-Agent"), null);
+        u.getId(),
+        "USER_REGISTER",
+        http.getRemoteAddr(),
+        http.getHeader("User-Agent"),
+        "termsVersion=" + TERMS_VERSION);
     // Cortesia: 1 crédito grátis de criação de currículo por conta nova.
     credits.grantCourtesyIfEligible(u.getId());
     return ResponseEntity.ok(view(u));

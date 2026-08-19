@@ -18,6 +18,9 @@ const registerSchema = z.object({
     .regex(/[^A-Za-z0-9]/, 'Deve conter pelo menos um símbolo (ex: !@#$)'),
   displayName: z.string().min(2, 'Nome deve ter pelo menos 2 caracteres').max(80),
   locale: z.enum(['pt-BR', 'en-US', 'es-ES']).optional(),
+  termsAccepted: z.literal(true, {
+    errorMap: () => ({ message: 'Você precisa aceitar os Termos de Uso para continuar.' }),
+  }),
 });
 
 export default function RegisterPage() {
@@ -26,13 +29,15 @@ export default function RegisterPage() {
     password: '',
     displayName: '',
     locale: 'pt-BR',
+    termsAccepted: false,
   });
   const [fieldErrors, setFieldErrors] = useState({});
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
   function handleChange(e) {
-    setForm({ ...form, [e.target.name]: e.target.value });
+    const value = e.target.type === 'checkbox' ? e.target.checked : e.target.value;
+    setForm({ ...form, [e.target.name]: value });
     setFieldErrors({ ...fieldErrors, [e.target.name]: undefined });
   }
 
@@ -155,6 +160,29 @@ export default function RegisterPage() {
                   <option value="en-US">English (US)</option>
                   <option value="es-ES">Español</option>
                 </select>
+              </div>
+
+              <div>
+                <label className="flex items-start gap-2 text-sm text-gray-700">
+                  <input
+                    id="termsAccepted"
+                    name="termsAccepted"
+                    type="checkbox"
+                    checked={form.termsAccepted}
+                    onChange={handleChange}
+                    className="mt-0.5 h-4 w-4 rounded border-gray-300 text-brand-600 focus:ring-brand-500"
+                  />
+                  <span>
+                    Li e aceito os{' '}
+                    <Link href="/termos" target="_blank" className="text-brand-700 underline">
+                      Termos de Uso e a Política de Privacidade
+                    </Link>
+                    .
+                  </span>
+                </label>
+                {fieldErrors.termsAccepted && (
+                  <p className="mt-1 text-xs text-red-600">{fieldErrors.termsAccepted}</p>
+                )}
               </div>
 
               {error && (
