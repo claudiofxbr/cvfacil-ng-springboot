@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { ShieldCheck, ShieldOff, KeyRound, AlertTriangle, Copy, Check } from 'lucide-react';
+import { ShieldCheck, ShieldOff, KeyRound, AlertTriangle, Copy, Check, Download, Trash2 } from 'lucide-react';
 import { useAuthStore } from '@/lib/stores/authStore';
 import { api } from '@/lib/apiClient';
 
@@ -241,6 +241,112 @@ function ChangePasswordSection({ status }) {
   );
 }
 
+// ── Exportar meus dados (LGPD Art. 18 / GDPR Art. 15-20) ────────────────────────
+function ExportDataSection() {
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+
+  async function onExport() {
+    setError('');
+    setLoading(true);
+    try {
+      const data = await api.get('/api/users/me/export');
+      const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `cvfacil-meus-dados-${new Date().toISOString().slice(0, 10)}.json`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch {
+      setError('Não foi possível gerar a exportação. Tente novamente.');
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  return (
+    <Card title="Exportar meus dados" icon={Download}>
+      <p className="mb-4 text-sm text-gray-600">
+        Baixe uma cópia de tudo que temos sobre você: dados de perfil, currículos e histórico de
+        créditos, em formato JSON.
+      </p>
+      {error && <p className="mb-2 text-xs text-red-600">{error}</p>}
+      <button onClick={onExport} disabled={loading} className="btn-primary py-2 disabled:opacity-60">
+        {loading ? 'Gerando...' : 'Baixar meus dados'}
+      </button>
+    </Card>
+  );
+}
+
+// ── Excluir minha conta (LGPD Art. 18 / GDPR Art. 17 — direito ao esquecimento) ──
+function DeleteAccountSection() {
+  const router = useRouter();
+  const clearSession = useAuthStore((s) => s.clearSession);
+  const [confirmText, setConfirmText] = useState('');
+  const [password, setPassword] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+
+  async function onSubmit(e) {
+    e.preventDefault();
+    setError('');
+    setLoading(true);
+    try {
+      await api.delete('/api/users/me', { password: password || undefined });
+      clearSession();
+      router.push('/');
+    } catch (err) {
+      if (err.status === 401) setError('Senha incorreta.');
+      else if (err.status === 409) setError('Contas Root não podem se autoexcluir por aqui.');
+      else setError('Não foi possível excluir a conta. Tente novamente.');
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  return (
+    <Card title="Excluir minha conta" icon={Trash2}>
+      <p className="mb-4 text-sm text-gray-600">
+        Isso apaga permanentemente sua conta, currículos e histórico de créditos. Não pode ser
+        desfeito.
+      </p>
+      <form onSubmit={onSubmit} className="space-y-3">
+        <div>
+          <label className="mb-1 block text-xs font-semibold text-gray-600">
+            Senha (deixe em branco se você usa login com Google)
+          </label>
+          <input
+            type="password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
+          />
+        </div>
+        <div>
+          <label className="mb-1 block text-xs font-semibold text-gray-600">
+            Digite EXCLUIR para confirmar
+          </label>
+          <input
+            type="text"
+            value={confirmText}
+            onChange={(e) => setConfirmText(e.target.value)}
+            className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
+          />
+        </div>
+        {error && <p className="text-xs text-red-600">{error}</p>}
+        <button
+          type="submit"
+          disabled={loading || confirmText !== 'EXCLUIR'}
+          className="flex items-center gap-1.5 rounded-md border border-red-200 px-3 py-2 text-sm font-semibold text-red-600 hover:bg-red-50 disabled:opacity-60"
+        >
+          <Trash2 size={14} /> Excluir minha conta
+        </button>
+      </form>
+    </Card>
+  );
+}
+
 export default function SecurityPage() {
   const router = useRouter();
   const user = useAuthStore((s) => s.user);
@@ -277,6 +383,8 @@ export default function SecurityPage() {
       </div>
       <MfaSection status={status} onChanged={loadStatus} />
       <ChangePasswordSection status={status} />
+      <ExportDataSection />
+      {status.role !== 'ROOT_MASTER' && <DeleteAccountSection />}
     </main>
   );
 }
