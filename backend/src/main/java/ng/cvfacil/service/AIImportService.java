@@ -157,6 +157,13 @@ public class AIImportService {
 
   // ── API publica ─────────────────────────────────────────────────────────────
 
+  /** Provedor de IA externo ativo (openai/anthropic/gemini) — usado para informar o titular dos
+   * dados, ao pedir consentimento, para onde o conteudo do curriculo sera enviado (LGPD Art. 9 /
+   * GDPR Art. 44-49, transferencia internacional). */
+  public String getProvider() {
+    return provider;
+  }
+
   /** Retorna true quando a chave de API esta configurada. */
   public boolean isConfigured() {
     return apiKey != null && !apiKey.isBlank();

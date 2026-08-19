@@ -2,6 +2,7 @@
 
 import { useState, useMemo, useRef } from 'react';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import { Search, Star, Upload, FileText, CheckCircle2, AlertCircle, Edit2, Trash2, Printer, Moon, Sparkles, Loader2 } from 'lucide-react';
 import { extractTextFromFile, parseResumeText } from '@/lib/parseResumeText';
 import { useResumeImportStore } from '@/lib/stores/resumeImportStore';
@@ -466,10 +467,19 @@ function ImportTab({ router }) {
   const [usedAI,      setUsedAI]      = useState(false);
   // aiFailReason: null | 'no-key' | 'offline' | 'auth' | 'server' | 'unknown'
   const [aiFailReason, setAiFailReason] = useState(null);
+  // LGPD Art. 9 / GDPR Art. 44-49: o currículo (dado pessoal) sai para um provedor de
+  // IA externo — precisa de consentimento explícito e específico a cada envio, não
+  // um aceite genérico dado uma vez no cadastro.
+  const [aiConsent, setAiConsent] = useState(false);
 
   // ── Passo 1: arquivo selecionado → tenta enviar para IA ───────────────────
   async function handleFile(file) {
     if (!file) return;
+    if (!aiConsent) {
+      setErrorMsg('Marque a autorização de envio à IA abaixo antes de selecionar o arquivo.');
+      setStatus('error');
+      return;
+    }
     if (file.size > 10 * 1024 * 1024) {
       setErrorMsg('Arquivo excede 10 MB.');
       setStatus('error');
@@ -494,6 +504,7 @@ function ImportTab({ router }) {
     try {
       const formData = new FormData();
       formData.append('file', file);
+      formData.append('aiConsent', String(aiConsent));
 
       // apiFetchForm adiciona automaticamente Authorization + X-XSRF-TOKEN (CSRF)
       // e credentials: 'include' — evita o 403 CSRF que o fetch() raw causava.
@@ -585,15 +596,36 @@ function ImportTab({ router }) {
         </div>
       </div>
 
+      {/* Consentimento LGPD/GDPR: o conteúdo do currículo sai para um provedor de IA
+          externo — precisa ser um opt-in explícito, não implícito ao soltar o arquivo. */}
+      <label className="mb-4 flex items-start gap-2 rounded-md border border-gray-200 bg-gray-50 p-3 text-sm text-gray-700">
+        <input
+          type="checkbox"
+          checked={aiConsent}
+          onChange={(e) => setAiConsent(e.target.checked)}
+          className="mt-0.5 h-4 w-4 rounded border-gray-300 text-brand-600 focus:ring-brand-500"
+        />
+        <span>
+          Autorizo o envio do conteúdo do meu currículo a um provedor de IA externo para extração
+          automática dos dados. Consulte os{' '}
+          <Link href="/termos" target="_blank" className="text-brand-700 underline">
+            Termos de Uso e a Política de Privacidade
+          </Link>{' '}
+          para saber quais dados são enviados.
+        </span>
+      </label>
+
       {/* Drop zone */}
       <div
-        className={`mb-4 flex flex-col items-center justify-center rounded-xl border-2 border-dashed p-8 text-center transition cursor-pointer
-          ${isProcessing
-            ? 'border-brand-300 bg-brand-50 cursor-wait'
-            : 'border-gray-300 bg-gray-50 hover:border-brand-500 hover:bg-brand-50'}`}
-        onClick={() => !isProcessing && fileRef.current?.click()}
+        className={`mb-4 flex flex-col items-center justify-center rounded-xl border-2 border-dashed p-8 text-center transition
+          ${!aiConsent
+            ? 'cursor-not-allowed border-gray-200 bg-gray-50 opacity-60'
+            : isProcessing
+              ? 'cursor-wait border-brand-300 bg-brand-50'
+              : 'cursor-pointer border-gray-300 bg-gray-50 hover:border-brand-500 hover:bg-brand-50'}`}
+        onClick={() => aiConsent && !isProcessing && fileRef.current?.click()}
         onDragOver={(e) => e.preventDefault()}
-        onDrop={(e) => { e.preventDefault(); if (!isProcessing) handleFile(e.dataTransfer.files?.[0]); }}
+        onDrop={(e) => { e.preventDefault(); if (aiConsent && !isProcessing) handleFile(e.dataTransfer.files?.[0]); }}
       >
         {isProcessing ? (
           <>

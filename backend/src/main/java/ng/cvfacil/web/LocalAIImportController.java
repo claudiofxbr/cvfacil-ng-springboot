@@ -38,7 +38,10 @@ public class LocalAIImportController {
   @PostMapping(
       consumes = MediaType.MULTIPART_FORM_DATA_VALUE,
       produces = MediaType.APPLICATION_JSON_VALUE)
-  public ResponseEntity<String> importResume(@RequestParam("file") MultipartFile file) {
-    return AIImportRequestSupport.handle(aiImportService, file, log, "[AI Import local]");
+  public ResponseEntity<String> importResume(
+      @RequestParam("file") MultipartFile file,
+      @RequestParam(value = "aiConsent", defaultValue = "false") boolean aiConsent) {
+    return AIImportRequestSupport.handle(
+        aiImportService, file, aiConsent, log, "[AI Import local]", null, null, null, null);
   }
 }

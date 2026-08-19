@@ -1,6 +1,9 @@
 package ng.cvfacil.web;
 
+import jakarta.servlet.http.HttpServletRequest;
+import java.util.UUID;
 import ng.cvfacil.service.AIImportService;
+import ng.cvfacil.service.AuditService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.context.annotation.Profile;
@@ -36,21 +39,45 @@ public class AIImportController {
   private static final Logger log = LoggerFactory.getLogger(AIImportController.class);
 
   private final AIImportService aiImportService;
+  private final AuditService audit;
 
-  public AIImportController(AIImportService aiImportService) {
+  public AIImportController(AIImportService aiImportService, AuditService audit) {
     this.aiImportService = aiImportService;
+    this.audit = audit;
   }
 
   @PostMapping(
       consumes = MediaType.MULTIPART_FORM_DATA_VALUE,
       produces = MediaType.APPLICATION_JSON_VALUE)
   public ResponseEntity<String> importResume(
-      @RequestParam("file") MultipartFile file, @AuthenticationPrincipal Jwt principal) {
+      @RequestParam("file") MultipartFile file,
+      @RequestParam(value = "aiConsent", defaultValue = "false") boolean aiConsent,
+      @AuthenticationPrincipal Jwt principal,
+      HttpServletRequest http) {
 
     if (principal == null) {
       return ResponseEntity.status(401).body("{\"error\":\"Autenticação necessária\"}");
     }
 
-    return AIImportRequestSupport.handle(aiImportService, file, log, "[AI Import]");
+    UUID userId = resolveUserId(principal);
+    return AIImportRequestSupport.handle(
+        aiImportService,
+        file,
+        aiConsent,
+        log,
+        "[AI Import]",
+        audit,
+        userId,
+        http.getRemoteAddr(),
+        http.getHeader("User-Agent"));
+  }
+
+  /** Extrai userId do JWT RS256 validado pelo Spring Security (única fonte confiável). */
+  private UUID resolveUserId(Jwt principal) {
+    try {
+      return UUID.fromString(principal.getSubject());
+    } catch (Exception ignored) {
+      return null;
+    }
   }
 }

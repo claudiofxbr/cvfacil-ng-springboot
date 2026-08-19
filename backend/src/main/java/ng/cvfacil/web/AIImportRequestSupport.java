@@ -1,7 +1,9 @@
 package ng.cvfacil.web;
 
 import java.util.Set;
+import java.util.UUID;
 import ng.cvfacil.service.AIImportService;
+import ng.cvfacil.service.AuditService;
 import org.slf4j.Logger;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.multipart.MultipartFile;
@@ -26,12 +28,30 @@ final class AIImportRequestSupport {
   private AIImportRequestSupport() {}
 
   static ResponseEntity<String> handle(
-      AIImportService aiImportService, MultipartFile file, Logger log, String logPrefix) {
+      AIImportService aiImportService,
+      MultipartFile file,
+      boolean aiConsent,
+      Logger log,
+      String logPrefix,
+      AuditService audit,
+      UUID userId,
+      String ip,
+      String userAgent) {
 
     if (!aiImportService.isConfigured()) {
       log.info(
           "{} AI_API_KEY não configurada — retornando 501 para fallback client-side", logPrefix);
       return ResponseEntity.status(501).body("{\"error\":\"IA não configurada neste servidor\"}");
+    }
+
+    // LGPD Art. 9 / GDPR Art. 44-49: o conteudo do curriculo (dado pessoal) e enviado a um
+    // provedor de IA externo — exige consentimento especifico e informado antes de cada envio,
+    // nao um aceite generico dado uma vez no cadastro.
+    if (!aiConsent) {
+      return ResponseEntity.badRequest()
+          .body(
+              "{\"error\":\"É necessário autorizar o envio do currículo ao provedor de IA externo"
+                  + " para usar esta função.\"}");
     }
 
     if (file == null || file.isEmpty()) {
@@ -56,6 +76,10 @@ final class AIImportRequestSupport {
 
     try {
       log.info("{} Importando '{}' ({} bytes)", logPrefix, fn, file.getSize());
+      if (audit != null && userId != null) {
+        audit.record(
+            userId, "AI_IMPORT_CONSENT", ip, userAgent, "provider=" + aiImportService.getProvider());
+      }
       String resultJson = aiImportService.importResume(file.getBytes(), fn);
       return ResponseEntity.ok(resultJson);
     } catch (IllegalArgumentException e) {
