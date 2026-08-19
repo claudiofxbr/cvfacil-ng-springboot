@@ -2,8 +2,10 @@ package ng.cvfacil.service;
 
 import java.time.Instant;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 import ng.cvfacil.domain.User;
+import ng.cvfacil.dto.PrivacyDtos.UserExport;
 import ng.cvfacil.repository.UserRepository;
 import org.springframework.stereotype.Service;
 
@@ -34,10 +36,12 @@ public class AdminService {
 
   private final UserRepository users;
   private final AuditService audit;
+  private final PrivacyService privacy;
 
-  public AdminService(UserRepository users, AuditService audit) {
+  public AdminService(UserRepository users, AuditService audit, PrivacyService privacy) {
     this.users = users;
     this.audit = audit;
+    this.privacy = privacy;
   }
 
   /**
@@ -56,6 +60,24 @@ public class AdminService {
   /** Disponível para ADMIN e ROOT_MASTER — checagem de papel fica no controller. */
   public List<UserAdminView> listUsers() {
     return users.findAll().stream().map(this::toView).toList();
+  }
+
+  /**
+   * Exportação dos dados de um usuário por um Admin/Root — mesma visão que o próprio titular
+   * obtém via PrivacyService.export (LGPD Art. 18), mas disparada por quem tem acesso ao painel
+   * admin (ex.: atender solicitação do titular por outro canal). Disponível para ADMIN e
+   * ROOT_MASTER (mesmo nível de listUsers); fica registrado em audit_logs por envolver dados
+   * pessoais de terceiros.
+   */
+  public Optional<UserExport> exportUser(UUID actingUserId, User.Role actingRole, UUID targetUserId) {
+    if (actingRole != User.Role.ADMIN && actingRole != User.Role.ROOT_MASTER) {
+      return Optional.empty();
+    }
+    Optional<UserExport> export = privacy.export(targetUserId);
+    if (export.isPresent()) {
+      audit.record(actingUserId, "ADMIN_EXPORT_USER_DATA", null, null, "target=" + targetUserId);
+    }
+    return export;
   }
 
   /**

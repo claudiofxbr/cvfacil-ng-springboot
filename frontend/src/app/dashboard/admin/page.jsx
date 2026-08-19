@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Users, Trash2, Coins, ShieldAlert } from 'lucide-react';
+import { Users, Trash2, Coins, ShieldAlert, Download } from 'lucide-react';
 import { useAuthStore } from '@/lib/stores/authStore';
 import { api } from '@/lib/apiClient';
 
@@ -20,6 +20,7 @@ export default function AdminPage() {
   const [creditTarget, setCreditTarget] = useState(null);
   const [creditAmount, setCreditAmount] = useState(3);
   const [busyId, setBusyId] = useState(null);
+  const [exportingId, setExportingId] = useState(null);
 
   useEffect(() => {
     if (hydrated && !user) router.push('/login');
@@ -61,6 +62,25 @@ export default function AdminPage() {
     } finally {
       setBusyId(null);
       setConfirmDeleteId(null);
+    }
+  }
+
+  async function handleExport(u) {
+    setExportingId(u.id);
+    setError('');
+    try {
+      const data = await api.get(`/api/admin/users/${u.id}/export`);
+      const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `cvfacil-dados-${u.email}-${new Date().toISOString().slice(0, 10)}.json`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch {
+      setError('Não foi possível exportar os dados deste usuário.');
+    } finally {
+      setExportingId(null);
     }
   }
 
@@ -119,7 +139,7 @@ export default function AdminPage() {
               <th className="px-4 py-3">E-mail</th>
               <th className="px-4 py-3">Papel</th>
               <th className="px-4 py-3">Criado em</th>
-              {isRoot && <th className="px-4 py-3 text-right">Ações</th>}
+              <th className="px-4 py-3 text-right">Ações</th>
             </tr>
           </thead>
           <tbody>
@@ -135,31 +155,40 @@ export default function AdminPage() {
                 <td className="px-4 py-3 text-gray-500">
                   {new Intl.DateTimeFormat('pt-BR', { dateStyle: 'short' }).format(new Date(u.createdAt))}
                 </td>
-                {isRoot && (
-                  <td className="px-4 py-3 text-right">
-                    <div className="flex justify-end gap-2">
-                      <button
-                        onClick={() => { setCreditTarget(u); setCreditAmount(3); }}
-                        className="flex items-center gap-1 rounded-md border border-gray-200 px-2 py-1 text-xs font-semibold text-gray-600 hover:bg-gray-50"
-                      >
-                        <Coins size={12} /> Créditos
-                      </button>
-                      {u.role !== 'ROOT_MASTER' && (
+                <td className="px-4 py-3 text-right">
+                  <div className="flex justify-end gap-2">
+                    <button
+                      onClick={() => handleExport(u)}
+                      disabled={exportingId === u.id}
+                      className="flex items-center gap-1 rounded-md border border-gray-200 px-2 py-1 text-xs font-semibold text-gray-600 hover:bg-gray-50 disabled:opacity-60"
+                    >
+                      <Download size={12} /> {exportingId === u.id ? 'Exportando...' : 'Exportar'}
+                    </button>
+                    {isRoot && (
+                      <>
                         <button
-                          onClick={() => handleDelete(u.id)}
-                          disabled={busyId === u.id}
-                          className={`flex items-center gap-1 rounded-md border px-2 py-1 text-xs font-semibold disabled:opacity-60 ${
-                            confirmDeleteId === u.id
-                              ? 'border-red-400 bg-red-50 text-red-700'
-                              : 'border-gray-200 text-gray-600 hover:bg-gray-50'
-                          }`}
+                          onClick={() => { setCreditTarget(u); setCreditAmount(3); }}
+                          className="flex items-center gap-1 rounded-md border border-gray-200 px-2 py-1 text-xs font-semibold text-gray-600 hover:bg-gray-50"
                         >
-                          <Trash2 size={12} /> {confirmDeleteId === u.id ? 'Confirmar' : 'Excluir'}
+                          <Coins size={12} /> Créditos
                         </button>
-                      )}
-                    </div>
-                  </td>
-                )}
+                        {u.role !== 'ROOT_MASTER' && (
+                          <button
+                            onClick={() => handleDelete(u.id)}
+                            disabled={busyId === u.id}
+                            className={`flex items-center gap-1 rounded-md border px-2 py-1 text-xs font-semibold disabled:opacity-60 ${
+                              confirmDeleteId === u.id
+                                ? 'border-red-400 bg-red-50 text-red-700'
+                                : 'border-gray-200 text-gray-600 hover:bg-gray-50'
+                            }`}
+                          >
+                            <Trash2 size={12} /> {confirmDeleteId === u.id ? 'Confirmar' : 'Excluir'}
+                          </button>
+                        )}
+                      </>
+                    )}
+                  </div>
+                </td>
               </tr>
             ))}
           </tbody>

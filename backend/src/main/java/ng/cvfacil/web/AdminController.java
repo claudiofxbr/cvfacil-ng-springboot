@@ -5,6 +5,7 @@ import jakarta.validation.constraints.Min;
 import java.util.List;
 import java.util.UUID;
 import ng.cvfacil.domain.User;
+import ng.cvfacil.dto.PrivacyDtos.UserExport;
 import ng.cvfacil.service.AdminService;
 import ng.cvfacil.service.CreditService;
 import org.springframework.context.annotation.Profile;
@@ -41,6 +42,21 @@ public class AdminController {
   @GetMapping("/users")
   public ResponseEntity<List<AdminService.UserAdminView>> users() {
     return ResponseEntity.ok(service.listUsers());
+  }
+
+  @GetMapping("/users/{id}/export")
+  public ResponseEntity<UserExport> exportUser(
+      @PathVariable UUID id, @AuthenticationPrincipal Jwt principal) {
+    UUID actingUserId = resolveUserId(principal);
+    User.Role actingRole = roleOf(principal);
+    if (actingUserId == null
+        || (actingRole != User.Role.ADMIN && actingRole != User.Role.ROOT_MASTER)) {
+      return ResponseEntity.status(403).build();
+    }
+    return service
+        .exportUser(actingUserId, actingRole, id)
+        .map(ResponseEntity::ok)
+        .orElseGet(() -> ResponseEntity.notFound().build());
   }
 
   @DeleteMapping("/users/{id}")

@@ -5,6 +5,7 @@ import jakarta.validation.Valid;
 import java.util.List;
 import java.util.UUID;
 import ng.cvfacil.domain.User;
+import ng.cvfacil.dto.PrivacyDtos.UserExport;
 import ng.cvfacil.repository.UserRepository;
 import ng.cvfacil.service.AdminService;
 import ng.cvfacil.service.CreditService;
@@ -49,6 +50,20 @@ public class LocalAdminController {
       @AuthenticationPrincipal Jwt principal, HttpServletRequest request) {
     if (roleOf(principal, request) == null) return ResponseEntity.status(403).build();
     return ResponseEntity.ok(service.listUsers());
+  }
+
+  @GetMapping("/users/{id}/export")
+  public ResponseEntity<UserExport> exportUser(
+      @PathVariable UUID id, @AuthenticationPrincipal Jwt principal, HttpServletRequest request) {
+    UUID actingUserId = resolveUserId(principal, request);
+    User.Role role = roleOf(principal, request);
+    if (actingUserId == null || (role != User.Role.ADMIN && role != User.Role.ROOT_MASTER)) {
+      return ResponseEntity.status(403).build();
+    }
+    return service
+        .exportUser(actingUserId, role, id)
+        .map(ResponseEntity::ok)
+        .orElseGet(() -> ResponseEntity.notFound().build());
   }
 
   @DeleteMapping("/users/{id}")
