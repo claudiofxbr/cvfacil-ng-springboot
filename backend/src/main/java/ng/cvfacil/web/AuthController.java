@@ -87,9 +87,9 @@ public class AuthController {
   }
 
   /**
-   * Versao vigente dos Termos de Uso/Politica de Privacidade — LGPD Art. 8 / GDPR Art. 7 exigem
-   * que o consentimento seja rastreavel a um documento especifico. Incrementar ao publicar uma
-   * nova versao dos termos (contas antigas mantem o registro do que aceitaram na epoca).
+   * Versao vigente dos Termos de Uso/Politica de Privacidade — LGPD Art. 8 / GDPR Art. 7 exigem que
+   * o consentimento seja rastreavel a um documento especifico. Incrementar ao publicar uma nova
+   * versao dos termos (contas antigas mantem o registro do que aceitaram na epoca).
    */
   private static final String TERMS_VERSION = "1.0";
 

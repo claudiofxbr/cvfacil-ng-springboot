@@ -78,7 +78,11 @@ final class AIImportRequestSupport {
       log.info("{} Importando '{}' ({} bytes)", logPrefix, fn, file.getSize());
       if (audit != null && userId != null) {
         audit.record(
-            userId, "AI_IMPORT_CONSENT", ip, userAgent, "provider=" + aiImportService.getProvider());
+            userId,
+            "AI_IMPORT_CONSENT",
+            ip,
+            userAgent,
+            "provider=" + aiImportService.getProvider());
       }
       String resultJson = aiImportService.importResume(file.getBytes(), fn);
       return ResponseEntity.ok(resultJson);
