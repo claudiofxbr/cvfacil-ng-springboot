@@ -4,6 +4,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import java.time.Duration;
 import java.util.Map;
+import java.util.Optional;
 import java.util.UUID;
 import ng.cvfacil.domain.User;
 import ng.cvfacil.dto.AuthDtos.ChangePasswordRequest;
@@ -40,6 +41,10 @@ import org.springframework.web.bind.annotation.*;
 @RestController
 @RequestMapping("/api/auth")
 public class AuthController {
+
+  /** Hash BCrypt sem senha real correspondente — usado só para equalizar timing no login. */
+  private static final String DUMMY_PASSWORD_HASH =
+      "$2b$12$C6UzMDM.H6dfI/f/IKcEeO6Bt8Q7QYIVeZWZ7SjKZG7qOJ2j9nHU.";
 
   private final UserRepository users;
   private final PasswordEncoder encoder;
@@ -125,8 +130,16 @@ public class AuthController {
       return ResponseEntity.status(429).build();
     }
 
-    User u =
-        users.findByEmailIgnoreCase(req.email()).orElseThrow(() -> new BadCredentialsException());
+    Optional<User> maybeUser = users.findByEmailIgnoreCase(req.email());
+    if (maybeUser.isEmpty()) {
+      // Roda um BCrypt.matches contra um hash dummy para gastar tempo comparável ao caminho de
+      // e-mail existente — sem isso, a resposta para "e-mail não existe" volta quase instantânea
+      // enquanto a de "senha errada" leva dezenas de ms (custo do BCrypt), permitindo enumerar
+      // contas cadastradas só pelo tempo de resposta do login.
+      encoder.matches(req.password(), DUMMY_PASSWORD_HASH);
+      throw new BadCredentialsException();
+    }
+    User u = maybeUser.get();
 
     if (u.getLockedUntil() != null && u.getLockedUntil().isAfter(java.time.Instant.now())) {
       return ResponseEntity.status(423).build(); // Locked
