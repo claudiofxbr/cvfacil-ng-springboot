@@ -13,7 +13,11 @@ export default function AdminPage() {
   const isRoot = user?.role === 'ROOT_MASTER';
   const isAdmin = isRoot || user?.role === 'ADMIN';
 
+  const PAGE_SIZE = 50;
   const [users, setUsers] = useState(null);
+  const [page, setPage] = useState(0);
+  const [hasMore, setHasMore] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [stats, setStats] = useState(null);
   const [error, setError] = useState('');
   const [confirmDeleteId, setConfirmDeleteId] = useState(null);
@@ -35,11 +39,32 @@ export default function AdminPage() {
   async function load() {
     setError('');
     try {
-      const [u, s] = await Promise.all([api.get('/api/admin/users'), api.get('/api/admin/stats')]);
-      setUsers(u);
+      const [u, s] = await Promise.all([
+        api.get(`/api/admin/users?page=0&size=${PAGE_SIZE}`),
+        api.get('/api/admin/stats'),
+      ]);
+      setUsers(u.content);
+      setPage(0);
+      setHasMore(!u.last);
       setStats(s);
     } catch {
       setError('Não foi possível carregar os usuários.');
+    }
+  }
+
+  async function loadMore() {
+    setLoadingMore(true);
+    setError('');
+    try {
+      const nextPage = page + 1;
+      const u = await api.get(`/api/admin/users?page=${nextPage}&size=${PAGE_SIZE}`);
+      setUsers((list) => [...list, ...u.content]);
+      setPage(nextPage);
+      setHasMore(!u.last);
+    } catch {
+      setError('Não foi possível carregar mais usuários.');
+    } finally {
+      setLoadingMore(false);
     }
   }
 
@@ -194,6 +219,18 @@ export default function AdminPage() {
           </tbody>
         </table>
       </div>
+
+      {hasMore && (
+        <div className="mt-4 flex justify-center">
+          <button
+            onClick={loadMore}
+            disabled={loadingMore}
+            className="rounded-md border border-gray-200 px-4 py-2 text-sm text-gray-600 hover:bg-gray-50 disabled:opacity-60"
+          >
+            {loadingMore ? 'Carregando...' : 'Carregar mais'}
+          </button>
+        </div>
+      )}
 
       {creditTarget && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">

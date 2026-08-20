@@ -1,12 +1,14 @@
 package ng.cvfacil.service;
 
 import java.time.Instant;
-import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import ng.cvfacil.domain.User;
 import ng.cvfacil.dto.PrivacyDtos.UserExport;
 import ng.cvfacil.repository.UserRepository;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 
 /**
@@ -57,9 +59,19 @@ public class AdminService {
     return users.count();
   }
 
-  /** Disponível para ADMIN e ROOT_MASTER — checagem de papel fica no controller. */
-  public List<UserAdminView> listUsers() {
-    return users.findAll().stream().map(this::toView).toList();
+  private static final int MAX_PAGE_SIZE = 100;
+
+  /**
+   * Disponível para ADMIN e ROOT_MASTER — checagem de papel fica no controller. Paginado: {@code
+   * findAll()} sem limite materializava a base inteira em memória a cada carregamento do painel,
+   * o que não escala conforme a base de usuários cresce.
+   */
+  public Page<UserAdminView> listUsers(int page, int size) {
+    int safePage = Math.max(page, 0);
+    int safeSize = Math.min(Math.max(size, 1), MAX_PAGE_SIZE);
+    return users
+        .findAll(PageRequest.of(safePage, safeSize, Sort.by(Sort.Direction.DESC, "createdAt")))
+        .map(this::toView);
   }
 
   /**

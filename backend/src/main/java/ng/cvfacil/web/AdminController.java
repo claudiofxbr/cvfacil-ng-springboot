@@ -2,13 +2,13 @@ package ng.cvfacil.web;
 
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Min;
-import java.util.List;
 import java.util.UUID;
 import ng.cvfacil.domain.User;
 import ng.cvfacil.dto.PrivacyDtos.UserExport;
 import ng.cvfacil.service.AdminService;
 import ng.cvfacil.service.CreditService;
 import org.springframework.context.annotation.Profile;
+import org.springframework.data.domain.Page;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
@@ -40,8 +40,9 @@ public class AdminController {
   }
 
   @GetMapping("/users")
-  public ResponseEntity<List<AdminService.UserAdminView>> users() {
-    return ResponseEntity.ok(service.listUsers());
+  public ResponseEntity<Page<AdminService.UserAdminView>> users(
+      @RequestParam(defaultValue = "0") int page, @RequestParam(defaultValue = "50") int size) {
+    return ResponseEntity.ok(service.listUsers(page, size));
   }
 
   @GetMapping("/users/{id}/export")
