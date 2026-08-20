@@ -30,6 +30,20 @@ export default function DashboardPage() {
   const [sort, setSort] = useState('recommended');
   const [favorites, setFavorites] = useState(new Set());
 
+  const resumes = useResumeListStore((s) => s.resumes);
+  const getResume = useResumeListStore((s) => s.getResume);
+  const saveResume = useResumeListStore((s) => s.saveResume);
+
+  async function handleApplyPhoto(resumeId, dataUrl) {
+    const resume = getResume(resumeId);
+    if (!resume) return;
+    await saveResume({
+      id: resume.id,
+      layoutId: resume.layoutId,
+      data: { ...resume.data, photo: dataUrl },
+    });
+  }
+
   function handleUse(layout, paletteId) {
     if (!user) {
       router.push('/login');
@@ -167,7 +181,7 @@ export default function DashboardPage() {
 
         {tab === 'photo' && (
           <div className="card p-6">
-            <PhotoPicker />
+            <PhotoPicker resumes={resumes} onApply={handleApplyPhoto} />
           </div>
         )}
 
