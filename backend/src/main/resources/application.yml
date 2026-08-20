@@ -100,6 +100,14 @@ cvfacil:
     base-url: ${AI_API_BASE_URL:https://api.openai.com/v1}
     api-key: ${AI_API_KEY:}
     model: ${AI_MODEL:gpt-4o-mini}
+  payment:
+    pagseguro:
+      access-token: ${PAGSEGURO_ACCESS_TOKEN:}
+      base-url: ${PAGSEGURO_BASE_URL:https://api.pagseguro.com}
+      # URL pública do backend para onde o PagSeguro envia a confirmação de pagamento
+      # (POST .../api/credits/webhook/pagseguro). Sem isso, /api/credits/purchase
+      # continua respondendo 501 mesmo com access-token configurado.
+      notification-url: ${PAGSEGURO_NOTIFICATION_URL:}
   ocr:
     # Habilitar OCR para PDFs escaneados (sem camada de texto).
     # Requer Tesseract 5 instalado no SO com pacotes de idioma.

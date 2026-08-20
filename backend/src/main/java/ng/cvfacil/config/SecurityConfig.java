@@ -156,6 +156,7 @@ public class SecurityConfig {
                 csrf.csrfTokenRepository(CookieCsrfTokenRepository.withHttpOnlyFalse())
                     .csrfTokenRequestHandler(csrfHandler)
                     .ignoringRequestMatchers(
+                        "/api/credits/webhook/**",
                         "/api/auth/login",
                         "/api/auth/register",
                         "/oauth2/**",
@@ -178,6 +179,11 @@ public class SecurityConfig {
                 auth.requestMatchers(HttpMethod.GET, "/actuator/health")
                     .permitAll()
                     .requestMatchers("/api/auth/**", "/oauth2/**", "/login/oauth2/**")
+                    .permitAll()
+                    // Webhook do PagSeguro: chamado pelo gateway (sem JWT nosso), autenticado
+                    // pela assinatura x-authenticity-token dentro do próprio controller —
+                    // ver PagSeguroWebhookController/PagSeguroClient.isValidWebhookSignature.
+                    .requestMatchers(HttpMethod.POST, "/api/credits/webhook/**")
                     .permitAll()
                     // Root e Admin entram no /api/admin/**; as ações restritas ao Root
                     // (excluir usuário, conceder créditos) são checadas dentro do

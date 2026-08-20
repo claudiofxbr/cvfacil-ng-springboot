@@ -1,8 +1,8 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Coins, Gift, ShoppingCart, AlertTriangle } from 'lucide-react';
+import { Coins, Gift, ShoppingCart, AlertTriangle, Copy, QrCode } from 'lucide-react';
 import { useAuthStore } from '@/lib/stores/authStore';
 import { api } from '@/lib/apiClient';
 
@@ -37,6 +37,9 @@ export default function CreditsPage() {
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
   const [buyingId, setBuyingId] = useState(null);
+  const [taxId, setTaxId] = useState('');
+  const [pendingOrder, setPendingOrder] = useState(null);
+  const pollRef = useRef(null);
 
   useEffect(() => {
     if (hydrated && !user) router.push('/login');
@@ -57,26 +60,65 @@ export default function CreditsPage() {
     }
   }
 
+  useEffect(() => {
+    return () => {
+      if (pollRef.current) clearInterval(pollRef.current);
+    };
+  }, []);
+
+  function startPollingWallet(balanceBefore) {
+    if (pollRef.current) clearInterval(pollRef.current);
+    let attempts = 0;
+    pollRef.current = setInterval(async () => {
+      attempts += 1;
+      try {
+        const resp = await api.get('/api/credits/wallet');
+        setWallet(resp);
+        if (resp.balance > balanceBefore) {
+          setPendingOrder(null);
+          setNotice('Pagamento confirmado! Créditos adicionados à sua conta.');
+          clearInterval(pollRef.current);
+        }
+      } catch {
+        // silencioso — tenta de novo no próximo tick
+      }
+      if (attempts >= 40) clearInterval(pollRef.current); // ~10 min a cada 15s
+    }, 15000);
+  }
+
   async function handleBuy(pkg) {
+    if (!/^\d{11}$/.test(taxId)) {
+      setError('Informe um CPF válido (11 dígitos) para gerar o Pix.');
+      return;
+    }
     setBuyingId(pkg.id);
     setNotice('');
     setError('');
     try {
-      await api.post('/api/credits/purchase', { packageId: pkg.id });
-      setNotice('Compra confirmada! Créditos adicionados à sua conta.');
-      loadWallet();
+      const resp = await api.post('/api/credits/purchase', { packageId: pkg.id, taxId });
+      setPendingOrder({ ...resp, pkg });
+      startPollingWallet(wallet.balance);
     } catch (err) {
       if (err.status === 501) {
         setNotice(
           'Pagamentos ainda não estão habilitados neste ambiente — o gateway de pagamento ' +
-          '(Mercado Pago) não foi configurado. Assim que estiver ativo, a compra dos pacotes ' +
+          '(PagSeguro) não foi configurado. Assim que estiver ativo, a compra dos pacotes ' +
           'abaixo será processada aqui automaticamente.'
         );
+      } else if (err.status === 502) {
+        setError('O PagSeguro está indisponível no momento. Tente novamente em instantes.');
       } else {
         setError('Não foi possível processar a compra. Tente novamente.');
       }
     } finally {
       setBuyingId(null);
+    }
+  }
+
+  function copyPixCode() {
+    if (pendingOrder?.qrCodeText) {
+      navigator.clipboard?.writeText(pendingOrder.qrCodeText);
+      setNotice('Código Pix copiado.');
     }
   }
 
@@ -117,11 +159,60 @@ export default function CreditsPage() {
         <div className="rounded-md bg-red-50 px-3 py-2.5 text-sm text-red-700">{error}</div>
       )}
 
-      {!wallet.unlimited && (
+      {!wallet.unlimited && pendingOrder && (
+        <div className="card flex flex-col items-center gap-3 p-6 text-center">
+          <h2 className="flex items-center gap-2 font-display text-lg font-bold text-gray-900">
+            <QrCode size={18} className="text-brand-700" /> Pague com Pix para confirmar
+          </h2>
+          <p className="text-sm text-gray-500">
+            {pendingOrder.pkg.credits} créditos — {pendingOrder.pkg.priceLabel}
+          </p>
+          {pendingOrder.qrCodeImageUrl && (
+            <img
+              src={pendingOrder.qrCodeImageUrl}
+              alt="QR Code Pix"
+              className="h-48 w-48 rounded-md border border-gray-200"
+            />
+          )}
+          {pendingOrder.qrCodeText && (
+            <button
+              onClick={copyPixCode}
+              className="flex items-center gap-1 rounded-md border border-gray-200 px-3 py-1.5 text-xs font-semibold text-gray-600 hover:bg-gray-50"
+            >
+              <Copy size={12} /> Copiar código Pix
+            </button>
+          )}
+          <p className="text-xs text-gray-400">
+            Assim que o pagamento for confirmado, os créditos aparecem aqui automaticamente.
+          </p>
+          <button
+            onClick={() => setPendingOrder(null)}
+            className="text-xs text-gray-400 underline"
+          >
+            Cancelar / fechar
+          </button>
+        </div>
+      )}
+
+      {!wallet.unlimited && !pendingOrder && (
         <div>
           <h2 className="mb-3 flex items-center gap-2 font-display text-lg font-bold text-gray-900">
             <ShoppingCart size={18} className="text-brand-700" /> Comprar créditos
           </h2>
+          <div className="mb-4">
+            <label className="mb-1 block text-xs font-semibold text-gray-500">
+              CPF (obrigatório para gerar o Pix)
+            </label>
+            <input
+              type="text"
+              inputMode="numeric"
+              maxLength={11}
+              value={taxId}
+              onChange={(e) => setTaxId(e.target.value.replace(/\D/g, ''))}
+              placeholder="Somente números"
+              className="w-full max-w-xs rounded-md border border-gray-200 px-3 py-2 text-sm"
+            />
+          </div>
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
             {PACKAGES.map((pkg) => (
               <div key={pkg.id} className="card flex flex-col items-center gap-2 p-5 text-center">
@@ -135,7 +226,7 @@ export default function CreditsPage() {
                   disabled={buyingId === pkg.id}
                   className="btn-primary w-full py-2 text-sm disabled:opacity-60"
                 >
-                  {buyingId === pkg.id ? 'Processando...' : 'Comprar'}
+                  {buyingId === pkg.id ? 'Gerando Pix...' : 'Comprar'}
                 </button>
               </div>
             ))}

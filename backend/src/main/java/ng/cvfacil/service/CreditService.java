@@ -1,10 +1,13 @@
 package ng.cvfacil.service;
 
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
+import ng.cvfacil.domain.CreditOrder;
 import ng.cvfacil.domain.CreditPackage;
 import ng.cvfacil.domain.CreditTransaction;
 import ng.cvfacil.domain.User;
+import ng.cvfacil.repository.CreditOrderRepository;
 import ng.cvfacil.repository.CreditTransactionRepository;
 import ng.cvfacil.repository.UserRepository;
 import org.springframework.beans.factory.annotation.Value;
@@ -26,27 +29,66 @@ public class CreditService {
 
   private final UserRepository users;
   private final CreditTransactionRepository transactions;
+  private final CreditOrderRepository orders;
   private final AuditService audit;
 
   /**
-   * NENHUM gateway de pagamento real está integrado ainda (Mercado Pago é o recomendado no PRD para
-   * Pix/boleto/cartão em BRL, mas exige credenciais reais que este ambiente não tem). Enquanto
-   * {@code cvfacil.payment.mercadopago .access-token} não estiver configurado,
+   * Enquanto {@code cvfacil.payment.pagseguro.access-token} não estiver configurado,
    * /api/credits/purchase responde 501 — mesmo padrão já usado em AIImportService.isConfigured()
    * para a IA.
    */
-  @Value("${cvfacil.payment.mercadopago.access-token:}")
-  private String mercadoPagoAccessToken;
+  @Value("${cvfacil.payment.pagseguro.access-token:}")
+  private String pagSeguroAccessToken;
 
   public CreditService(
-      UserRepository users, CreditTransactionRepository transactions, AuditService audit) {
+      UserRepository users,
+      CreditTransactionRepository transactions,
+      CreditOrderRepository orders,
+      AuditService audit) {
     this.users = users;
     this.transactions = transactions;
+    this.orders = orders;
     this.audit = audit;
   }
 
   public boolean isPurchaseGatewayConfigured() {
-    return mercadoPagoAccessToken != null && !mercadoPagoAccessToken.isBlank();
+    return pagSeguroAccessToken != null && !pagSeguroAccessToken.isBlank();
+  }
+
+  /** Registra o pedido PENDING criado no PagSeguro — chamado antes de redirecionar/exibir o Pix. */
+  @Transactional
+  public CreditOrder createPendingOrder(UUID userId, CreditPackage pack, String pagSeguroOrderId) {
+    CreditOrder order = new CreditOrder();
+    order.setUserId(userId);
+    order.setPack(pack);
+    order.setPagSeguroOrderId(pagSeguroOrderId);
+    return orders.save(order);
+  }
+
+  /**
+   * Confirma o pagamento a partir do webhook — idempotente: só concede crédito se a transição
+   * PENDING -&gt; PAID de fato ocorrer agora (ver CreditOrderRepository.updateStatusIfCurrent). Uma
+   * segunda chamada com o mesmo pagSeguroOrderId (reenvio de webhook) não credita de novo.
+   *
+   * @return true se creditou agora; false se o pedido já estava processado ou não existe.
+   */
+  @Transactional
+  public boolean confirmOrderPaid(String pagSeguroOrderId) {
+    int updated =
+        orders.updateStatusIfCurrent(
+            pagSeguroOrderId, CreditOrder.Status.PENDING, CreditOrder.Status.PAID);
+    if (updated == 0) return false;
+    Optional<CreditOrder> order = orders.findByPagSeguroOrderId(pagSeguroOrderId);
+    if (order.isEmpty()) return false;
+    grantPurchase(order.get().getUserId(), order.get().getPack());
+    return true;
+  }
+
+  /** Marca o pedido como recusado/cancelado — nenhum crédito é concedido. */
+  @Transactional
+  public void confirmOrderFailed(String pagSeguroOrderId) {
+    orders.updateStatusIfCurrent(
+        pagSeguroOrderId, CreditOrder.Status.PENDING, CreditOrder.Status.FAILED);
   }
 
   /** Concede 1 crédito de cortesia — idempotente, só concede uma vez por conta. */
