@@ -20,7 +20,8 @@ public class CreditTransaction {
   @GeneratedValue(strategy = GenerationType.UUID)
   private UUID id;
 
-  @Column(name = "user_id", nullable = false)
+  /** Nulo quando o titular exerceu o direito de exclusão (LGPD Art. 18) — a linha do ledger é preservada. */
+  @Column(name = "user_id")
   private UUID userId;
 
   @Enumerated(EnumType.STRING)
