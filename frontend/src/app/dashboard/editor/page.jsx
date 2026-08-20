@@ -35,14 +35,25 @@ function Field({ label, children, hint }) {
 const inputCls =
   'w-full rounded border border-gray-300 px-2.5 py-1.5 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500';
 
+const MAX_PHOTO_SIZE_BYTES = 5 * 1024 * 1024; // 5 MB — mesmo limite do PhotoPicker (aba Foto 3x4)
+
 // ── Seção: Dados Pessoais ──────────────────────────────────────────────────────
 function PersonalSection({ data, onChange }) {
   const photoRef = useRef(null);
+  const [photoError, setPhotoError] = useState('');
   const set = (key) => (e) => onChange({ ...data, [key]: e.target.value });
 
   function handlePhotoFile(file) {
+    setPhotoError('');
     if (!file) return;
-    if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) return;
+    if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) {
+      setPhotoError('Formato inválido. Use JPEG, PNG ou WebP.');
+      return;
+    }
+    if (file.size > MAX_PHOTO_SIZE_BYTES) {
+      setPhotoError('Arquivo excede 5 MB.');
+      return;
+    }
     const reader = new FileReader();
     reader.onload = (e) => onChange({ ...data, photo: e.target.result });
     reader.readAsDataURL(file);
@@ -76,6 +87,7 @@ function PersonalSection({ data, onChange }) {
               className="sr-only" onChange={(e) => handlePhotoFile(e.target.files?.[0])} />
           </div>
         </div>
+        {photoError && <p role="alert" className="mt-1 text-xs text-red-600">{photoError}</p>}
       </Field>
 
       <Field label="Nome completo">
