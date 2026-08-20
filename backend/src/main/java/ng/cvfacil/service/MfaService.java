@@ -3,6 +3,7 @@ package ng.cvfacil.service;
 import java.util.UUID;
 import ng.cvfacil.domain.User;
 import ng.cvfacil.repository.UserRepository;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
 /**
@@ -20,17 +21,34 @@ public class MfaService {
   private final UserRepository users;
   private final TotpService totp;
   private final AuditService audit;
+  private final PasswordEncoder encoder;
 
-  public MfaService(UserRepository users, TotpService totp, AuditService audit) {
+  public MfaService(
+      UserRepository users, TotpService totp, AuditService audit, PasswordEncoder encoder) {
     this.users = users;
     this.totp = totp;
     this.audit = audit;
+    this.encoder = encoder;
   }
 
   public record SetupResult(String secret, String otpAuthUri) {}
 
-  public SetupResult setup(UUID userId) {
+  public static class ReauthRequiredException extends RuntimeException {}
+
+  /**
+   * Gera um novo secret TOTP. Se a conta já tem MFA ativo, exige a senha atual — sem isso, um
+   * access token vazado bastaria para trocar o secret e derrubar a proteção de MFA sem que o
+   * dono da conta percebesse (o novo secret não é mostrado a ninguém além de quem já tem o token).
+   */
+  public SetupResult setup(UUID userId, String password) {
     User u = users.findById(userId).orElseThrow();
+    if (u.isMfaEnabled()) {
+      if (password == null
+          || u.getPasswordHash() == null
+          || !encoder.matches(password, u.getPasswordHash())) {
+        throw new ReauthRequiredException();
+      }
+    }
     String secret = totp.generateSecret();
     u.setMfaSecret(secret);
     u.setMfaEnabled(false);

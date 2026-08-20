@@ -36,12 +36,20 @@ public class MfaController {
 
   public record DisableRequest(@NotBlank String password) {}
 
+  public record SetupRequest(String password) {}
+
   @PostMapping("/setup")
   public ResponseEntity<MfaService.SetupResult> setup(
-      @AuthenticationPrincipal Jwt principal, HttpServletRequest http) {
+      @RequestBody(required = false) SetupRequest req,
+      @AuthenticationPrincipal Jwt principal,
+      HttpServletRequest http) {
     UUID userId = resolveUserId(principal, http);
     if (userId == null) return ResponseEntity.status(401).build();
-    return ResponseEntity.ok(mfa.setup(userId));
+    try {
+      return ResponseEntity.ok(mfa.setup(userId, req != null ? req.password() : null));
+    } catch (MfaService.ReauthRequiredException e) {
+      return ResponseEntity.status(401).build();
+    }
   }
 
   @PostMapping("/confirm")
