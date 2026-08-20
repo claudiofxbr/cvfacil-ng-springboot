@@ -1,0 +1,74 @@
+# ============================================================================
+# Profile "privacytest" — ativa a configuração de SEGURANÇA DE PRODUÇÃO
+# (SecurityConfig, JwtDecoder RS256, PrivacyController — todos @Profile("!local"))
+# dentro de um teste de integração, sem depender de infraestrutura externa.
+#
+# Por que não usar o profile "local" (como AuthControllerIntegrationTest)?
+# LocalSecurityConfig NÃO ativa oauth2ResourceServer (sem JwtDecoder) e
+# PrivacyController é @Profile("!local") — ou seja, fica fora do contexto
+# exatamente no profile usado pelos testes existentes. Este profile evita
+# "local" para que SecurityConfig/PrivacyController sejam carregados.
+#
+# O par de chaves RSA e a ENCRYPTION_MASTER_KEY abaixo são descartáveis,
+# gerados só para satisfazer a validação de startup (KeyFactory/AES-256) —
+# nenhum token real é assinado com essa chave privada nos testes: a
+# autenticação é injetada diretamente via
+# SecurityMockMvcRequestPostProcessors.jwt(...), que não invoca o JwtDecoder.
+# ============================================================================
+
+spring:
+  flyway:
+    baseline-on-migrate: true
+  mail:
+    host: localhost
+    port: 25
+  security:
+    oauth2:
+      client:
+        registration:
+          google:
+            client-id: privacytest-dev-unused
+            client-secret: privacytest-dev-unused
+            scope: openid,email,profile
+        provider:
+          google:
+            authorization-uri: http://localhost:8080/oauth2/authorize/google-stub
+            token-uri: http://localhost:8080/oauth2/token/google-stub
+            user-info-uri: http://localhost:8080/oauth2/userinfo/google-stub
+            jwk-set-uri: http://localhost:8080/oauth2/jwks/google-stub
+            user-name-attribute: email
+
+cvfacil:
+  jwt:
+    issuer: https://test.cvfacil.ng
+    access-ttl-minutes: 15
+    refresh-ttl-days: 7
+    private-key: ""
+    # Chave pública RSA-2048 descartável — só satisfaz a validação de startup do
+    # NimbusJwtDecoder (SecurityConfig). Nenhum JWT real é decodificado nestes
+    # testes (ver comentário acima).
+    public-key: |
+      -----BEGIN PUBLIC KEY-----
+      MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAu7/hHfi4hac6zVJl53Ui
+      sw/ZbZntNlc6rOOwCrWTpn/kfJEm9+OlvgePMA1QnFM4YDZAdJ8IJxPzmXzagrHC
+      c7w7550/JEScz7dXLUmLICOKFgIGhGJOGHOCM+WG/Fs8WgHNIq2czcm8i8qXrUEV
+      KlZcW4N5CjoGi+iNWDRM7oIZLySnk0AcuDnlWm3cn7chUEiXcTbTutsNTHOqxEjT
+      MMQU0kByOcV6fYYL7FGSvrzrBLsB/zp/JEA6uYEaYRfEDFdAty9+U+PHzndnLgzP
+      S7dy5fwg7K1dTw22S8u9N3FSby9hNK0vPSXC71oNIhIBy9NvhyIcfth3qkm0/BeJ
+      sQIDAQAB
+      -----END PUBLIC KEY-----
+  security:
+    cors-allowed-origins: http://localhost:3000
+    cookie-secure: false
+  ocr:
+    enabled: false
+  encryption:
+    # Chave AES-256 descartável, só para os testes deste profile — CryptoConfig
+    # aborta o startup fora do profile "local" se ficar em branco.
+    master-key: "oA3hh2vNKsBrEMQrT0y8MKc0bfYv0ME/f8WFfEHUNBc="
+
+logging:
+  level:
+    root: WARN
+    ng.cvfacil: INFO
+    org.springframework.security: WARN
