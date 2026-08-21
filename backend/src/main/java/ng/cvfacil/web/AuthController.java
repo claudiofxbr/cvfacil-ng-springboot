@@ -3,6 +3,7 @@ package ng.cvfacil.web;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import java.time.Duration;
+import java.time.Instant;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
@@ -27,6 +28,7 @@ import ng.cvfacil.service.PasswordPolicyService.PolicyViolationException;
 import ng.cvfacil.service.PasswordResetService;
 import ng.cvfacil.service.RateLimitService;
 import ng.cvfacil.service.RootIpAllowlistService;
+import ng.cvfacil.service.TokenRevocationService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.ResponseCookie;
@@ -56,6 +58,7 @@ public class AuthController {
   private final MfaService mfa;
   private final PasswordPolicyService passwordPolicy;
   private final RootIpAllowlistService ipAllowlist;
+  private final TokenRevocationService revocation;
 
   /**
    * JwtDecoder apenas disponível no profile "!local" (SecurityConfig). Injetado de forma opcional
@@ -78,7 +81,8 @@ public class AuthController {
       CreditService credits,
       MfaService mfa,
       PasswordPolicyService passwordPolicy,
-      RootIpAllowlistService ipAllowlist) {
+      RootIpAllowlistService ipAllowlist,
+      TokenRevocationService revocation) {
     this.users = users;
     this.encoder = encoder;
     this.jwt = jwt;
@@ -89,6 +93,7 @@ public class AuthController {
     this.mfa = mfa;
     this.passwordPolicy = passwordPolicy;
     this.ipAllowlist = ipAllowlist;
+    this.revocation = revocation;
   }
 
   /**
@@ -344,24 +349,67 @@ public class AuthController {
    *
    * <p>Em dev local ({@code JwtDecoder} não disponível): aceita o formato legado {@code
    * STUB_REFRESH.<userId>.<uuid>} sem validação criptográfica.
+   *
+   * <p>Rotação com revogação: o refresh token apresentado é revogado (via {@code jti}) assim que
+   * usado com sucesso — um mesmo refresh token só pode ser trocado uma vez. Sem isso, um token
+   * roubado continuaria criptograficamente válido por até {@code refreshTtlDays} mesmo depois do
+   * dono ter trocado de sessão; com rotação, o reuso do token antigo (pelo atacante ou pelo dono
+   * legítimo, o que acontecer primeiro) é detectado e rejeitado.
    */
   @PostMapping("/refresh")
   public ResponseEntity<LoginResponse> refresh(
       @CookieValue(name = "refresh_token", required = false) String refreshToken) {
 
-    UUID userId = decodeTypedToken(refreshToken, "STUB_REFRESH.", "refresh");
-    if (userId == null) return ResponseEntity.status(401).build();
+    DecodedRefresh decoded = decodeRefreshToken(refreshToken);
+    if (decoded == null) return ResponseEntity.status(401).build();
+    if (revocation.isRevoked(decoded.jti())) return ResponseEntity.status(401).build();
 
-    User u = users.findById(userId).orElse(null);
+    User u = users.findById(decoded.userId()).orElse(null);
     if (u == null) return ResponseEntity.status(401).build();
 
+    revocation.revoke(decoded.jti(), decoded.expiresAt());
+
     String newAccess = jwt.issueAccessToken(u);
-    String newRefresh = jwt.issueRefreshToken(userId);
+    String newRefresh = jwt.issueRefreshToken(u.getId());
 
     return ResponseEntity.ok()
         .header("Set-Cookie", buildRefreshCookie(newRefresh).toString())
         .body(new LoginResponse(view(u), newAccess));
   }
+
+  /**
+   * Decodifica o refresh token e extrai também o {@code jti}, usado por {@link
+   * TokenRevocationService}. Separado de {@link #decodeTypedToken} porque os demais tipos de token
+   * (mfa_challenge) são de uso único e curta duração (5 min) — não precisam de revogação
+   * server-side.
+   */
+  private DecodedRefresh decodeRefreshToken(String token) {
+    if (token == null || token.isBlank()) return null;
+    if (jwtDecoder == null) {
+      if (token.startsWith("STUB_REFRESH.")) {
+        String[] parts = token.split("\\.", 3);
+        if (parts.length < 3) return null;
+        try {
+          UUID userId = UUID.fromString(parts[1]);
+          return new DecodedRefresh(
+              userId, parts[2], java.time.Instant.now().plus(jwt.refreshTtl()));
+        } catch (IllegalArgumentException e) {
+          return null;
+        }
+      }
+      return null;
+    }
+    try {
+      Jwt decoded = jwtDecoder.decode(token);
+      if (!"refresh".equals(decoded.getClaimAsString("type"))) return null;
+      return new DecodedRefresh(
+          UUID.fromString(decoded.getSubject()), decoded.getId(), decoded.getExpiresAt());
+    } catch (JwtException | IllegalArgumentException e) {
+      return null;
+    }
+  }
+
+  private record DecodedRefresh(UUID userId, String jti, Instant expiresAt) {}
 
   @PostMapping("/forgot-password")
   public ResponseEntity<Void> forgotPassword(
@@ -382,8 +430,18 @@ public class AuthController {
     return ok ? ResponseEntity.ok().build() : ResponseEntity.status(400).build();
   }
 
+  /**
+   * Revoga o refresh token corrente (via {@code jti}) além de limpar o cookie — sem isso, um
+   * refresh token capturado antes do logout (ex.: por um script malicioso no navegador
+   * compartilhado) continuava válido mesmo após o usuário "sair".
+   */
   @PostMapping("/logout")
-  public ResponseEntity<Void> logout() {
+  public ResponseEntity<Void> logout(
+      @CookieValue(name = "refresh_token", required = false) String refreshToken) {
+    DecodedRefresh decoded = decodeRefreshToken(refreshToken);
+    if (decoded != null) {
+      revocation.revoke(decoded.jti(), decoded.expiresAt());
+    }
     ResponseCookie expire =
         ResponseCookie.from("refresh_token", "")
             .httpOnly(true)
