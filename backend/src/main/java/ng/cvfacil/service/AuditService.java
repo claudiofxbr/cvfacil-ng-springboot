@@ -28,6 +28,14 @@ import org.springframework.transaction.annotation.Transactional;
  * Agora o serializador é um advisory lock transacional do próprio Postgres (pg_advisory_xact_lock)
  * — funciona entre instâncias e é liberado automaticamente no fim da transação, sem risco de lock
  * órfão.
+ *
+ * <p>MITIGAÇÃO (contenção sob carga): pg_advisory_xact_lock por padrão bloqueia indefinidamente.
+ * Como record() roda inline no caminho de login/logout/créditos (não em background), um pico de
+ * concorrência faria requisições — e as conexões do pool Hikari que elas seguram — empilharem à
+ * espera do mesmo lock, podendo esgotar o pool para toda a aplicação, não só para auditoria. Um
+ * lock_timeout de sessão limita a espera; como record() já trata qualquer exceção como não crítica
+ * (loga e retorna null sem propagar), o pior caso vira "essa entrada de auditoria não foi gravada
+ * desta vez" em vez de travar requisições não relacionadas.
  */
 @Service
 public class AuditService {
@@ -59,6 +67,9 @@ public class AuditService {
     try {
       // Serializa leitura+escrita do último hash entre todas as instâncias do
       // backend. Liberado automaticamente ao fim desta transação.
+      // lock_timeout bounded evita empilhar conexões do pool indefinidamente sob
+      // contenção (ver javadoc da classe) — SET LOCAL vale só para esta transação.
+      entityManager.createNativeQuery("SET LOCAL lock_timeout = '3s'").executeUpdate();
       entityManager
           .createNativeQuery("SELECT pg_advisory_xact_lock(:key)")
           .setParameter("key", AUDIT_CHAIN_LOCK_KEY)
