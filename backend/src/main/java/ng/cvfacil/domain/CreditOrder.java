@@ -6,8 +6,8 @@ import java.util.UUID;
 
 /**
  * Pedido de compra de créditos junto ao PagSeguro — vida útil PENDING até o webhook confirmar
- * (PAID) ou recusar (FAILED). credit_transactions só ganha uma linha quando o status vira PAID
- * (ver CreditService.grantPurchase), nunca antes.
+ * (PAID) ou recusar (FAILED). credit_transactions só ganha uma linha quando o status vira PAID (ver
+ * CreditService.grantPurchase), nunca antes.
  */
 @Entity
 @Table(name = "credit_orders")
@@ -23,7 +23,10 @@ public class CreditOrder {
   @GeneratedValue(strategy = GenerationType.UUID)
   private UUID id;
 
-  /** Nulo quando o titular exerceu o direito de exclusão (LGPD Art. 18) — a linha do ledger é preservada. */
+  /**
+   * Nulo quando o titular exerceu o direito de exclusão (LGPD Art. 18) — a linha do ledger é
+   * preservada.
+   */
   @Column(name = "user_id")
   private UUID userId;
 

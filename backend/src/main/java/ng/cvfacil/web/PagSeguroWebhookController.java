@@ -17,9 +17,9 @@ import org.springframework.web.bind.annotation.RestController;
  * assinatura x-authenticity-token (ver PagSeguroClient.isValidWebhookSignature e SecurityConfig,
  * onde /api/credits/webhook/** é liberado do filtro JWT).
  *
- * <p>Idempotente: CreditService.confirmOrderPaid só concede crédito na primeira confirmação de
- * cada pedido (CreditOrderRepository.markPaidIfPending); reenvios do PagSeguro (comportamento
- * normal de gateways) são no-op.
+ * <p>Idempotente: CreditService.confirmOrderPaid só concede crédito na primeira confirmação de cada
+ * pedido (CreditOrderRepository.markPaidIfPending); reenvios do PagSeguro (comportamento normal de
+ * gateways) são no-op.
  */
 @RestController
 @RequestMapping("/api/credits/webhook")
@@ -62,8 +62,7 @@ public class PagSeguroWebhookController {
         }
         case "DECLINED", "CANCELED" -> {
           credits.confirmOrderFailed(orderId);
-          log.info(
-              "[PagSeguro Webhook] Pedido {} {} — nenhum crédito concedido.", orderId, status);
+          log.info("[PagSeguro Webhook] Pedido {} {} — nenhum crédito concedido.", orderId, status);
         }
         default ->
             log.info(

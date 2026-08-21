@@ -63,8 +63,8 @@ public class AdminService {
 
   /**
    * Disponível para ADMIN e ROOT_MASTER — checagem de papel fica no controller. Paginado: {@code
-   * findAll()} sem limite materializava a base inteira em memória a cada carregamento do painel,
-   * o que não escala conforme a base de usuários cresce.
+   * findAll()} sem limite materializava a base inteira em memória a cada carregamento do painel, o
+   * que não escala conforme a base de usuários cresce.
    */
   public Page<UserAdminView> listUsers(int page, int size) {
     int safePage = Math.max(page, 0);

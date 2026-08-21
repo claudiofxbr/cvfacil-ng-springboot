@@ -37,8 +37,8 @@ public class MfaService {
 
   /**
    * Gera um novo secret TOTP. Se a conta já tem MFA ativo, exige a senha atual — sem isso, um
-   * access token vazado bastaria para trocar o secret e derrubar a proteção de MFA sem que o
-   * dono da conta percebesse (o novo secret não é mostrado a ninguém além de quem já tem o token).
+   * access token vazado bastaria para trocar o secret e derrubar a proteção de MFA sem que o dono
+   * da conta percebesse (o novo secret não é mostrado a ninguém além de quem já tem o token).
    */
   public SetupResult setup(UUID userId, String password) {
     User u = users.findById(userId).orElseThrow();

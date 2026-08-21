@@ -47,9 +47,9 @@ import org.springframework.test.web.servlet.MockMvc;
  * já que {@code LocalDatabaseConfig} só se ativa no profile "local".
  *
  * <p>{@code jwt()} injeta a autenticação diretamente no {@code SecurityContext} do MockMvc sem
- * passar pelo {@code JwtDecoder} — por isso não é necessário assinar tokens com a chave privada
- * RSA real; o "sub" do JWT simulado é o UUID do usuário criado no teste, exatamente como o
- * {@code SecurityConfig} de produção espera (ver {@code PrivacyController.resolveUserId}).
+ * passar pelo {@code JwtDecoder} — por isso não é necessário assinar tokens com a chave privada RSA
+ * real; o "sub" do JWT simulado é o UUID do usuário criado no teste, exatamente como o {@code
+ * SecurityConfig} de produção espera (ver {@code PrivacyController.resolveUserId}).
  */
 @SpringBootTest
 @AutoConfigureMockMvc
@@ -93,7 +93,9 @@ class PrivacyControllerIntegrationTest {
     r.setContentEnc(cipher.encrypt("{\"fullName\":\"Privacy Export\"}".getBytes()));
     resumes.save(r);
 
-    mvc.perform(get("/api/users/me/export").with(jwt().jwt(j -> j.subject(testUser.getId().toString()))))
+    mvc.perform(
+            get("/api/users/me/export")
+                .with(jwt().jwt(j -> j.subject(testUser.getId().toString()))))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.id").value(testUser.getId().toString()))
         .andExpect(jsonPath("$.email").value("privacy-test@cvfacil.ng"))
@@ -163,7 +165,9 @@ class PrivacyControllerIntegrationTest {
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(mapper.writeValueAsString(req)))
         .andExpect(status().isConflict())
-        .andExpect(jsonPath("$.error").value("Contas Root não podem se autoexcluir. Transfira o papel antes."));
+        .andExpect(
+            jsonPath("$.error")
+                .value("Contas Root não podem se autoexcluir. Transfira o papel antes."));
 
     assertThat(users.findById(testUser.getId())).isPresent();
   }

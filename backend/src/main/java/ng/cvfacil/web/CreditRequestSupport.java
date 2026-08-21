@@ -34,8 +34,8 @@ final class CreditRequestSupport {
 
   /**
    * Cria o pedido de pagamento via Pix no PagSeguro e registra um CreditOrder PENDING local. O
-   * crédito só é concedido quando o webhook confirmar o pagamento (ver
-   * PagSeguroWebhookController), nunca nesta requisição síncrona.
+   * crédito só é concedido quando o webhook confirmar o pagamento (ver PagSeguroWebhookController),
+   * nunca nesta requisição síncrona.
    */
   static ResponseEntity<PurchaseResponse> purchase(
       CreditService credits,
@@ -55,11 +55,7 @@ final class CreditRequestSupport {
       String referenceId = UUID.randomUUID().toString();
       PagSeguroClient.OrderResult result =
           pagSeguro.createPixOrder(
-              referenceId,
-              req.packageId(),
-              user.getDisplayName(),
-              user.getEmail(),
-              req.taxId());
+              referenceId, req.packageId(), user.getDisplayName(), user.getEmail(), req.taxId());
 
       CreditOrder order =
           credits.createPendingOrder(userId, req.packageId(), result.pagSeguroOrderId());

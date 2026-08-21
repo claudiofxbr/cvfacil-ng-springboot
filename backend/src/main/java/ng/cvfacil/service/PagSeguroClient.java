@@ -25,9 +25,9 @@ import org.springframework.stereotype.Service;
  * <p>Referência oficial: https://developer.pagbank.com.br/reference/criar-pedido e
  * https://developer.pagbank.com.br/reference/confirmar-autenticidade-da-notificacao — consultadas
  * em 2026-08-20. A resposta exata do webhook (payload de charges[].status) não pôde ser validada
- * contra o sandbox real neste ambiente (sem acesso a testes end-to-end); revisar o payload
- * recebido no primeiro teste real e ajustar {@link #extractOrderId} / {@link #extractChargeStatus}
- * se os nomes de campo divergirem.
+ * contra o sandbox real neste ambiente (sem acesso a testes end-to-end); revisar o payload recebido
+ * no primeiro teste real e ajustar {@link #extractOrderId} / {@link #extractChargeStatus} se os
+ * nomes de campo divergirem.
  */
 @Service
 public class PagSeguroClient {
@@ -165,8 +165,8 @@ public class PagSeguroClient {
   /**
    * Valida a assinatura do webhook conforme documentação oficial: SHA-256 de
    * "{access-token}-{payload_bruto_sem_reformatacao}", comparado ao header x-authenticity-token.
-   * Qualquer divergência (inclusive de formatação do payload) deve ser tratada como notificação
-   * NÃO confiável e rejeitada — nunca processar um evento sem essa validação passar.
+   * Qualquer divergência (inclusive de formatação do payload) deve ser tratada como notificação NÃO
+   * confiável e rejeitada — nunca processar um evento sem essa validação passar.
    */
   public boolean isValidWebhookSignature(String rawPayload, String authenticityTokenHeader) {
     if (authenticityTokenHeader == null || authenticityTokenHeader.isBlank()) return false;
