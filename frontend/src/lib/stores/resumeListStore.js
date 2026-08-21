@@ -1,6 +1,7 @@
 import { create } from 'zustand';
-import { persist } from 'zustand/middleware';
+import { persist, createJSONStorage } from 'zustand/middleware';
 import { api } from '@/lib/apiClient';
+import { encryptedLocalStorage } from '@/lib/secureStorage';
 
 /**
  * Armazena todos os currículos criados/salvos pelo usuário.
@@ -147,6 +148,11 @@ export const useResumeListStore = create(
         }
       },
     }),
-    { name: 'cvfacil-resumes' }
+    {
+      name: 'cvfacil-resumes',
+      // Currículos contêm PII (nome, contato, foto) — criptografados em repouso no
+      // localStorage; ver lib/secureStorage.js para o modelo de ameaça.
+      storage: createJSONStorage(() => encryptedLocalStorage),
+    }
   )
 );
