@@ -73,17 +73,23 @@ export const encryptedLocalStorage = {
   },
   setItem: async (name, value) => {
     if (typeof window === 'undefined') return;
-    const key = await getOrCreateKey();
-    const iv = crypto.getRandomValues(new Uint8Array(12));
-    const encrypted = await crypto.subtle.encrypt(
-      { name: 'AES-GCM', iv },
-      key,
-      new TextEncoder().encode(value)
-    );
-    window.localStorage.setItem(
-      name,
-      JSON.stringify({ iv: bufferToBase64(iv), data: bufferToBase64(encrypted) })
-    );
+    try {
+      const key = await getOrCreateKey();
+      const iv = crypto.getRandomValues(new Uint8Array(12));
+      const encrypted = await crypto.subtle.encrypt(
+        { name: 'AES-GCM', iv },
+        key,
+        new TextEncoder().encode(value)
+      );
+      window.localStorage.setItem(
+        name,
+        JSON.stringify({ iv: bufferToBase64(iv), data: bufferToBase64(encrypted) })
+      );
+    } catch {
+      // zustand/persist não aguarda esta promise (fire-and-forget) — uma rejeição aqui
+      // vira unhandled rejection em vez de erro tratável pelo chamador. Falha ao gravar não é
+      // crítica (o state em memória já está correto; só a persistência entre reloads falha).
+    }
   },
   removeItem: (name) => {
     if (typeof window === 'undefined') return;
