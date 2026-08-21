@@ -141,8 +141,8 @@ export function PhotoPicker({ primary = '#1F3A5F', secondary = '#D8E3F2', resume
             </label>
             {resumes.length === 0 ? (
               <p className="text-sm text-gray-500">
-                Você ainda não tem currículos salvos — crie um em "Modelos de Currículos" antes de
-                aplicar a foto.
+                Você ainda não tem currículos salvos — crie um em &ldquo;Modelos de
+                Currículos&rdquo; antes de aplicar a foto.
               </p>
             ) : (
               <>
