@@ -65,11 +65,41 @@ Authorized JavaScript origins:
 https://cvfacil-ng.xavierbr-vps.tech:8443
 ```
 
-Enquanto `GOOGLE_OAUTH_CLIENT_ID`/`GOOGLE_OAUTH_CLIENT_SECRET` no
-`backend.env` da VPS estiverem com os valores placeholder
+**Status (resolvido em 2026-08-21):** credenciais reais configuradas
+(`GOOGLE_OAUTH_CLIENT_ID`/`GOOGLE_OAUTH_CLIENT_SECRET` no `backend.env` da
+VPS, Client ID `130848217255-...apps.googleusercontent.com`). Login Google
+testado de ponta a ponta em navegador real: consentimento do Google →
+redirect → `/api/auth/refresh`, `/api/resumes`, `/api/credits/wallet`
+todos 200 → sessão autenticada no dashboard.
+
+Enquanto os valores estiverem com o placeholder antigo
 (`disabled-client.apps.googleusercontent.com` / `disabled-secret`), o botão
-"Entrar com Google" redireciona ao Google mas a autenticação real falha —
-só funciona após configurar credenciais reais.
+"Entrar com Google" redireciona ao Google mas retorna **Erro 401:
+invalid_client — "The OAuth client was not found"**, porque esse client_id
+nunca existiu de fato no Google Cloud Console — é só um valor sentinela
+para o Spring Boot subir sem falhar a validação de `client-id` não-vazio
+(ver comentário em `application.yml`).
+
+### Pegadinha: `docker restart` NÃO recarrega env vars
+
+Editar `backend.env` e rodar `docker restart <container>` **não é
+suficiente** — variáveis de ambiente de um container Docker são fixadas na
+**criação** (`docker run --env ...`), não relidas do arquivo a cada
+restart. Foi exatamente isso que causou o erro persistir mesmo depois do
+`backend.env` já estar com os valores corretos.
+
+Além disso, `ci_deploy.py` (usado em todo deploy via CI/CD) **copia o env
+do container atualmente rodando** para o container novo — ele não lê
+`backend.env` também. Ou seja, uma vez corrigido manualmente uma vez, o
+valor correto se propaga sozinho nos deploys seguintes; mas se o container
+for recriado do zero (`docker rm` + `docker run` manual sem copiar o env
+antigo), a variável precisa ser reaplicada.
+
+Para aplicar uma env var nova/corrigida em produção sem esperar o próximo
+deploy: recriar o container copiando o env atual e substituindo só as
+chaves necessárias (mesmo padrão do `ci_deploy.py` — `docker inspect
+--format '{{json .Config.Env}}'`, editar, `docker run` de novo com
+`--env` por chave). Um `docker restart` sozinho não resolve.
 
 ## Bug corrigido: porta `:8443` faltando em 3 variáveis
 
