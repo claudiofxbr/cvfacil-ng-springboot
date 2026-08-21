@@ -205,7 +205,9 @@ else {
         if (-not $erro) {
             Log-Info "Servico alvo: $servico"
 
-            & ssh @sshBase "echo '$TokenRegistry' | docker login ghcr.io -u $UsuarioRegistry --password-stdin" 2>&1 | Out-Null
+            # Token enviado via stdin do proprio ssh (nao interpolado no comando remoto) para nao
+            # aparecer no `ps aux` da VPS durante a execucao do login.
+            $TokenRegistry | & ssh @sshBase "docker login ghcr.io -u $UsuarioRegistry --password-stdin" 2>&1 | Out-Null
             if ($LASTEXITCODE -ne 0) { Log-Falha "Login no GHCR falhou na VPS." }
             else {
                 Log-Ok "Autenticado no GHCR"
