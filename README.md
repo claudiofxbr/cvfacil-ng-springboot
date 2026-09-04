@@ -110,6 +110,22 @@ Ver `docs/SECURITY.md` para o modelo de ameaças completo.
 
 ---
 
+## Torre de Controle dos Processos
+
+Painel de status do pipeline CI/CD, publicado como Claude Artifact: https://claude.ai/code/artifact/5571a2a0-087b-4ff3-9cbe-15d76b05564e
+
+**Mecanismo de atualização: manual, sob demanda ("clique único"), não automático.**
+
+Uma rotina cloud agendada (`cvfacil-ng-torre-controle-refresh`, hora em hora) foi testada e descartada: ela consegue ler o GitHub Actions (`gh run list`) normalmente, mas trava ao tentar gravar o resultado no banco do artifact — a escrita dispara um prompt de permissão que nenhuma sessão desacompanhada pode aprovar, e a plataforma bloqueia deliberadamente qualquer tentativa de configurar a sessão para pular esse prompt (`bypassPermissions`), por ser uma barreira de segurança contra automações que escrevem dados sem supervisão humana. A rotina permanece cadastrada porém **desativada** (`enabled:false`).
+
+Por isso, a atualização do painel é feita pedindo ao Claude, em uma sessão interativa: *"atualiza a torre de controle"*. O passo a passo (reprodutível manualmente também via `gh` CLI, se necessário):
+
+1. `gh run list --repo claudiofxbr/cvfacil-ng-springboot --limit 10 --json databaseId,name,event,status,conclusion,createdAt,headBranch,headSha`
+2. Mapear os workflows `CI` e `Deploy — Hostinger` para `active`/`running`/`failed` conforme o `status`/`conclusion` do run mais recente.
+3. Gravar o resultado no documento `status/cvfacil-ng` do artifact acima (`write_db`, `db_op: "set"`), preservando os campos `project`, `categories`, `statusLabels`, `readyBanner` e a fila (`queue`) já cadastrados, e atualizando `updatedAt` para a hora UTC atual.
+
+---
+
 ## Plano de Execução (Resumo)
 
 | Fase | Semanas | Entregável |
