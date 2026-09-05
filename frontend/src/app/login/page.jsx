@@ -188,8 +188,14 @@ export default function LoginPage() {
               href={`${apiBase}/oauth2/authorization/google`}
               className="btn-secondary w-full justify-center py-3"
             >
-              <GoogleIcon /> <span className="ml-2">Entrar com Google</span>
+              <GoogleIcon /> <span className="ml-2">Entrar ou criar conta com Google</span>
             </a>
+            {/* O backend já cria a conta automaticamente no primeiro login com Google
+                (ver OAuth2LoginSuccessHandler) — este texto só deixa isso visível para
+                quem ainda não tem conta, sem precisar de um segundo botão redundante. */}
+            <p className="mt-2 text-center text-xs text-gray-400">
+              Novo por aqui? O mesmo botão já cria sua conta automaticamente.
+            </p>
 
             {/* Mock OAuth — exibido em dev quando o backend redireciona com ?mock_oauth=true */}
             {mockOauth && (
