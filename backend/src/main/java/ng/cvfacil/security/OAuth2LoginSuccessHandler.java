@@ -12,6 +12,7 @@ import ng.cvfacil.service.CreditService;
 import ng.cvfacil.service.TokenRevocationService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.http.ResponseCookie;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.oauth2.core.user.OAuth2User;
@@ -48,8 +49,15 @@ public class OAuth2LoginSuccessHandler implements AuthenticationSuccessHandler {
   @Value("${cvfacil.security.cookie-secure:true}")
   private boolean cookieSecure;
 
-  /** Só disponível fora do profile "local" (SecurityConfig) — ver AuthController.jwtDecoder. */
+  /**
+   * Só disponível fora do profile "local" (ver AuthController.jwtDecoder). {@code @Lazy} é
+   * necessário aqui (e não só {@code required = false}): SecurityConfig injeta este handler direto
+   * num {@code @Bean} (a filter chain), e o próprio {@code jwtDecoder()} também é definido em
+   * SecurityConfig — sem adiar a resolução, Spring via BeanCurrentlyInCreationException
+   * (SecurityConfig → OAuth2LoginSuccessHandler → jwtDecoder → SecurityConfig).
+   */
   @Autowired(required = false)
+  @Lazy
   private JwtDecoder jwtDecoder;
 
   public OAuth2LoginSuccessHandler(
