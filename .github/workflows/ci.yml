@@ -123,9 +123,14 @@ jobs:
           fetch-depth: 0
 
       - name: Gitleaks
+        # BUG CORRIGIDO: sem GITHUB_TOKEN, a action faz suas chamadas de verificacao a
+        # api.github.com sem autenticacao (limite de 60/h, compartilhado por todo runner
+        # hospedado) — ao bater no rate limit, ela nao consegue confirmar elegibilidade de
+        # uso gratuito e cai no enforcement de licenca paga ("missing gitleaks license"),
+        # mesmo o repo nao precisando de licenca nenhuma para gitleaks em si.
         uses: gitleaks/gitleaks-action@v2
-        with:
-          config-path: .gitleaks.toml
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Trivy (dependências do repositório)
         # Pinado por commit SHA (nao por tag) por causa do comprometimento de cadeia de
