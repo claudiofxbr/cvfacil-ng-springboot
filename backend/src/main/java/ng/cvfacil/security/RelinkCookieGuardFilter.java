@@ -26,12 +26,17 @@ import org.springframework.web.filter.OncePerRequestFilter;
  * exatamente o efeito relatado como "reset impede incluir novos logins com Gmail": o cadastro/login
  * normal nunca acontece, e some silenciosamente dentro do fluxo de troca de conta de outra pessoa.
  *
- * <p>Correção: o botão de login/cadastro normal com Google nunca envia {@code
- * ?prompt=select_account} (só o fluxo de troca de conta faz isso — ver
- * GoogleAccountSection#startRelink no frontend). Este filtro intercepta {@code
- * /oauth2/authorization/google} ANTES do redirect ao Google e apaga qualquer {@code relink_state}
- * remanescente sempre que a requisição não for explicitamente uma tentativa de troca de conta —
- * fechando a janela de contaminação cruzada na origem, sem alterar o fluxo de troca de conta em si.
+ * <p>Correção: o botão de login/cadastro normal com Google nunca envia {@code ?relink=1} (só o
+ * fluxo de troca de conta faz isso — ver GoogleAccountSection#startRelink no frontend). Este filtro
+ * intercepta {@code /oauth2/authorization/google} ANTES do redirect ao Google e apaga qualquer
+ * {@code relink_state} remanescente sempre que a requisição não for explicitamente uma tentativa de
+ * troca de conta — fechando a janela de contaminação cruzada na origem, sem alterar o fluxo de
+ * troca de conta em si.
+ *
+ * <p>NOTA: o marcador é {@code relink}, não {@code prompt} — desde que o login/cadastro normal
+ * também passou a enviar {@code ?prompt=select_account} (para deixar escolher uma conta Google
+ * diferente da já ativa no navegador, em vez de reautenticar silenciosamente), o valor de {@code
+ * prompt} deixou de diferenciar os dois fluxos.
  */
 public class RelinkCookieGuardFilter extends OncePerRequestFilter {
 
@@ -48,7 +53,7 @@ public class RelinkCookieGuardFilter extends OncePerRequestFilter {
       HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)
       throws ServletException, IOException {
     if (AUTHORIZATION_PATH.equals(request.getRequestURI())
-        && !"select_account".equals(request.getParameter("prompt"))) {
+        && !"1".equals(request.getParameter("relink"))) {
       Cookie expire = new Cookie("relink_state", "");
       expire.setPath("/");
       expire.setHttpOnly(true);

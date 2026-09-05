@@ -255,7 +255,10 @@ function GoogleAccountSection({ currentEmail }) {
     setLoading(true);
     try {
       await api.post('/api/auth/google/relink/start', {});
-      window.location.href = `${apiBase}/oauth2/authorization/google?prompt=select_account`;
+      // relink=1 é o marcador exclusivo deste fluxo (ver RelinkCookieGuardFilter) — desde
+      // que o login normal também passou a usar prompt=select_account, o guard não pode
+      // mais usar esse parâmetro sozinho para diferenciar os dois fluxos.
+      window.location.href = `${apiBase}/oauth2/authorization/google?prompt=select_account&relink=1`;
     } catch {
       setError('Não foi possível iniciar a troca. Tente novamente.');
       setLoading(false);

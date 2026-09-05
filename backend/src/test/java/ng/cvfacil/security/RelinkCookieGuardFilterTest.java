@@ -17,7 +17,7 @@ class RelinkCookieGuardFilterTest {
   private final RelinkCookieGuardFilter filter = new RelinkCookieGuardFilter(true);
 
   @Test
-  void loginNormalSemPromptApagaRelinkStateRemanescente() throws Exception {
+  void loginNormalSemRelinkApagaRelinkStateRemanescente() throws Exception {
     MockHttpServletRequest request =
         new MockHttpServletRequest("GET", "/oauth2/authorization/google");
     MockHttpServletResponse response = new MockHttpServletResponse();
@@ -32,10 +32,30 @@ class RelinkCookieGuardFilterTest {
   }
 
   @Test
-  void trocaDeContaComPromptSelectAccountNaoMexeNoCookie() throws Exception {
+  void loginNormalComPromptSelectAccountAindaApagaRelinkState() throws Exception {
+    // Login/cadastro normal também passou a enviar ?prompt=select_account (para deixar
+    // escolher uma conta Google diferente) — sem o marcador dedicado ?relink=1, o guard
+    // não pode mais confiar em "prompt" para diferenciar os dois fluxos.
     MockHttpServletRequest request =
         new MockHttpServletRequest("GET", "/oauth2/authorization/google");
     request.setParameter("prompt", "select_account");
+    MockHttpServletResponse response = new MockHttpServletResponse();
+    FilterChain chain = mock(FilterChain.class);
+
+    filter.doFilterInternal(request, response, chain);
+
+    Cookie expired = response.getCookie("relink_state");
+    assertThat(expired).isNotNull();
+    assertThat(expired.getMaxAge()).isZero();
+    verify(chain).doFilter(request, response);
+  }
+
+  @Test
+  void trocaDeContaComRelinkMarcadoNaoMexeNoCookie() throws Exception {
+    MockHttpServletRequest request =
+        new MockHttpServletRequest("GET", "/oauth2/authorization/google");
+    request.setParameter("prompt", "select_account");
+    request.setParameter("relink", "1");
     HttpServletResponse response = mock(HttpServletResponse.class);
     FilterChain chain = mock(FilterChain.class);
 

@@ -184,8 +184,12 @@ export default function LoginPage() {
               Use sua conta Google ou seu e-mail e senha.
             </p>
 
+            {/* BUG CORRIGIDO: sem ?prompt=select_account, o Google reautentica
+                silenciosamente com a última conta ativa na sessão do navegador —
+                quem já tem uma conta Google logada nunca via a opção de escolher
+                outra para criar um cadastro novo no CVFacil.NG. */}
             <a
-              href={`${apiBase}/oauth2/authorization/google`}
+              href={`${apiBase}/oauth2/authorization/google?prompt=select_account`}
               className="btn-secondary w-full justify-center py-3"
             >
               <GoogleIcon /> <span className="ml-2">Entrar ou criar conta com Google</span>
