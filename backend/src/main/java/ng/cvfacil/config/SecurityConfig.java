@@ -9,6 +9,7 @@ import java.util.List;
 import ng.cvfacil.security.HttpCookieOAuth2AuthorizationRequestRepository;
 import ng.cvfacil.security.OAuth2LoginSuccessHandler;
 import ng.cvfacil.security.PromptAwareAuthorizationRequestResolver;
+import ng.cvfacil.security.RelinkCookieGuardFilter;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -21,6 +22,7 @@ import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.oauth2.client.registration.ClientRegistrationRepository;
+import org.springframework.security.oauth2.client.web.OAuth2AuthorizationRequestRedirectFilter;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.security.oauth2.jwt.NimbusJwtDecoder;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationConverter;
@@ -63,6 +65,9 @@ public class SecurityConfig {
 
   @Value("${cvfacil.frontend.base-url:http://localhost:3000}")
   private String frontendBaseUrl;
+
+  @Value("${cvfacil.security.cookie-secure:true}")
+  private boolean cookieSecure;
 
   private final OAuth2LoginSuccessHandler oAuth2LoginSuccessHandler;
 
@@ -220,7 +225,13 @@ public class SecurityConfig {
                         new SimpleUrlAuthenticationFailureHandler(
                             frontendBaseUrl + "/login?error=oauth_failed")))
         .oauth2ResourceServer(
-            rs -> rs.jwt(jwt -> jwt.jwtAuthenticationConverter(jwtAuthenticationConverter())));
+            rs -> rs.jwt(jwt -> jwt.jwtAuthenticationConverter(jwtAuthenticationConverter())))
+        // Ver RelinkCookieGuardFilter: limpa um relink_state remanescente sempre que a
+        // requisição a /oauth2/authorization/google não for explicitamente a troca de conta —
+        // evita que ela seja incorretamente aplicada a um login/cadastro normal com Google.
+        .addFilterBefore(
+            new RelinkCookieGuardFilter(cookieSecure),
+            OAuth2AuthorizationRequestRedirectFilter.class);
 
     return http.build();
   }
