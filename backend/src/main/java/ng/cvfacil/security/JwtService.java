@@ -180,8 +180,8 @@ public class JwtService {
   /**
    * Token de curta duração (5 min) emitido quando um usuário já autenticado pede para trocar a
    * conta Google vinculada ao login — carrega o {@code userId} através do redirect para o Google e
-   * de volta (cookie httpOnly {@code relink_state}), já que o callback OAuth só enxerga cookies, não
-   * o header Authorization da sessão atual. Uso único: {@link
+   * de volta (cookie httpOnly {@code relink_state}), já que o callback OAuth só enxerga cookies,
+   * não o header Authorization da sessão atual. Uso único: {@link
    * ng.cvfacil.security.OAuth2LoginSuccessHandler} apaga o cookie assim que consome o token.
    */
   public String issueGoogleRelinkToken(UUID userId) {

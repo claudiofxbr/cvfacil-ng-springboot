@@ -249,7 +249,8 @@ class OAuth2LoginSuccessHandlerTest {
 
   private jakarta.servlet.http.Cookie[] relinkCookie(UUID userId) {
     return new jakarta.servlet.http.Cookie[] {
-      new jakarta.servlet.http.Cookie("relink_state", "STUB_RELINK." + userId + "." + UUID.randomUUID())
+      new jakarta.servlet.http.Cookie(
+          "relink_state", "STUB_RELINK." + userId + "." + UUID.randomUUID())
     };
   }
 
@@ -278,7 +279,12 @@ class OAuth2LoginSuccessHandlerTest {
     verify(response).addHeader(eq("Set-Cookie"), contains("refresh_token="));
 
     verify(audit)
-        .record(eq(userId), eq("GOOGLE_ACCOUNT_RELINKED"), any(), any(), contains("conta.nova@gmail.com"));
+        .record(
+            eq(userId),
+            eq("GOOGLE_ACCOUNT_RELINKED"),
+            any(),
+            any(),
+            contains("conta.nova@gmail.com"));
     verify(response).sendRedirect(FRONTEND_BASE_URL + "/dashboard/security?relink=success");
     // sem jwtDecoder (profile local) não há como decodificar o refresh_token antigo — não revoga
     verify(revocation, never()).revoke(any(), any());
@@ -298,13 +304,15 @@ class OAuth2LoginSuccessHandlerTest {
 
     when(request.getCookies()).thenReturn(relinkCookie(userId));
     when(users.findById(userId)).thenReturn(Optional.of(current));
-    when(users.findByEmailIgnoreCase("ja.cadastrado@gmail.com")).thenReturn(Optional.of(outraConta));
+    when(users.findByEmailIgnoreCase("ja.cadastrado@gmail.com"))
+        .thenReturn(Optional.of(outraConta));
 
     OAuth2User principal = oauth2User("ja.cadastrado@gmail.com", "Ja Cadastrado");
     handler.onAuthenticationSuccess(request, response, authenticationFor(principal));
 
     verify(users, never()).save(any());
-    verify(response).sendRedirect(FRONTEND_BASE_URL + "/dashboard/security?relink=error&reason=in_use");
+    verify(response)
+        .sendRedirect(FRONTEND_BASE_URL + "/dashboard/security?relink=error&reason=in_use");
     verifyNoInteractions(audit);
   }
 

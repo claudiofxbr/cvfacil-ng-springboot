@@ -189,7 +189,9 @@ public class OAuth2LoginSuccessHandler implements AuthenticationSuccessHandler {
    * dela é sobrescrito, num único save.
    */
   private void handleGoogleRelink(
-      UUID relinkUserId, String newGoogleEmail, HttpServletRequest request,
+      UUID relinkUserId,
+      String newGoogleEmail,
+      HttpServletRequest request,
       HttpServletResponse response)
       throws IOException {
     User target = users.findById(relinkUserId).orElse(null);
