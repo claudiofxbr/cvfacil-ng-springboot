@@ -8,6 +8,7 @@ import java.util.Base64;
 import java.util.List;
 import ng.cvfacil.security.HttpCookieOAuth2AuthorizationRequestRepository;
 import ng.cvfacil.security.OAuth2LoginSuccessHandler;
+import ng.cvfacil.security.PromptAwareAuthorizationRequestResolver;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -19,6 +20,7 @@ import org.springframework.security.config.annotation.web.configuration.EnableWe
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.security.oauth2.client.registration.ClientRegistrationRepository;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.security.oauth2.jwt.NimbusJwtDecoder;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationConverter;
@@ -145,8 +147,22 @@ public class SecurityConfig {
     return converter;
   }
 
+  /**
+   * Repassa {@code ?prompt=...} de {@code /oauth2/authorization/google} para a URL de autorização
+   * do Google — ver {@link PromptAwareAuthorizationRequestResolver} para o bug que isso corrige
+   * (troca de conta Google não forçava mais o seletor de contas).
+   */
   @Bean
-  public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
+  public PromptAwareAuthorizationRequestResolver promptAwareAuthorizationRequestResolver(
+      ClientRegistrationRepository clientRegistrationRepository) {
+    return new PromptAwareAuthorizationRequestResolver(
+        clientRegistrationRepository, "/oauth2/authorization");
+  }
+
+  @Bean
+  public SecurityFilterChain securityFilterChain(
+      HttpSecurity http, PromptAwareAuthorizationRequestResolver authorizationRequestResolver)
+      throws Exception {
     CsrfTokenRequestAttributeHandler csrfHandler = new CsrfTokenRequestAttributeHandler();
     csrfHandler.setCsrfRequestAttributeName(null);
 
@@ -197,8 +213,8 @@ public class SecurityConfig {
                 oauth
                     .authorizationEndpoint(
                         a ->
-                            a.authorizationRequestRepository(
-                                cookieAuthorizationRequestRepository()))
+                            a.authorizationRequestRepository(cookieAuthorizationRequestRepository())
+                                .authorizationRequestResolver(authorizationRequestResolver))
                     .successHandler(oAuth2LoginSuccessHandler)
                     .failureHandler(
                         new SimpleUrlAuthenticationFailureHandler(
