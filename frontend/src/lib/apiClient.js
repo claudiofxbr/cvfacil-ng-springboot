@@ -40,8 +40,21 @@ export async function apiFetch(path, { method = 'GET', body, headers = {} } = {}
     error.body = text;
     throw error;
   }
+  return parseJsonBody(res);
+}
+
+/**
+ * Vários endpoints (ex: /api/auth/google/relink/start, change-password, MFA, admin)
+ * respondem 200 sem corpo (ResponseEntity.ok().build()), não 204 — chamar res.json()
+ * incondicionalmente nesses casos lança "Unexpected end of JSON input" mesmo com a
+ * requisição bem-sucedida, e o catch do componente mostra um erro genérico apesar do
+ * backend ter funcionado. BUG ENCONTRADO ao investigar "troca de conta Google falha".
+ */
+async function parseJsonBody(res) {
   if (res.status === 204) return null;
-  return res.json();
+  const text = await res.text();
+  if (!text) return null;
+  return JSON.parse(text);
 }
 
 /**
@@ -74,8 +87,7 @@ export async function apiFetchForm(path, formData) {
     error.body = text;
     throw error;
   }
-  if (res.status === 204) return null;
-  return res.json();
+  return parseJsonBody(res);
 }
 
 export const api = {
