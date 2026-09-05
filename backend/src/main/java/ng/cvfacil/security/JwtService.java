@@ -177,6 +177,37 @@ public class JwtService {
     }
   }
 
+  /**
+   * Token de curta duração (5 min) emitido quando um usuário já autenticado pede para trocar a
+   * conta Google vinculada ao login — carrega o {@code userId} através do redirect para o Google e
+   * de volta (cookie httpOnly {@code relink_state}), já que o callback OAuth só enxerga cookies, não
+   * o header Authorization da sessão atual. Uso único: {@link
+   * ng.cvfacil.security.OAuth2LoginSuccessHandler} apaga o cookie assim que consome o token.
+   */
+  public String issueGoogleRelinkToken(UUID userId) {
+    if (signer == null) {
+      return "STUB_RELINK." + userId + "." + UUID.randomUUID();
+    }
+    try {
+      Instant now = Instant.now();
+      JWTClaimsSet claims =
+          new JWTClaimsSet.Builder()
+              .issuer(issuer)
+              .subject(userId.toString())
+              .claim("type", "google_relink")
+              .issueTime(Date.from(now))
+              .expirationTime(Date.from(now.plus(Duration.ofMinutes(5))))
+              .jwtID(UUID.randomUUID().toString())
+              .build();
+      SignedJWT jwt = new SignedJWT(new JWSHeader(JWSAlgorithm.RS256), claims);
+      jwt.sign(signer);
+      return jwt.serialize();
+    } catch (Exception e) {
+      throw new IllegalStateException(
+          "[JwtService] Erro ao assinar relink token: " + e.getMessage(), e);
+    }
+  }
+
   /** {@code true} quando a chave privada está carregada e tokens RS256 reais são emitidos. */
   public boolean isRealSigningActive() {
     return signer != null;

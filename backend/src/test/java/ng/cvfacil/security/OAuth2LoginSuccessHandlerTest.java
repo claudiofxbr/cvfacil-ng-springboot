@@ -13,6 +13,7 @@ import ng.cvfacil.domain.User;
 import ng.cvfacil.repository.UserRepository;
 import ng.cvfacil.service.AuditService;
 import ng.cvfacil.service.CreditService;
+import ng.cvfacil.service.TokenRevocationService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
@@ -33,6 +34,7 @@ class OAuth2LoginSuccessHandlerTest {
   private JwtService jwt;
   private CreditService credits;
   private AuditService audit;
+  private TokenRevocationService revocation;
   private HttpServletRequest request;
   private HttpServletResponse response;
   private OAuth2LoginSuccessHandler handler;
@@ -45,10 +47,11 @@ class OAuth2LoginSuccessHandlerTest {
     jwt = mock(JwtService.class);
     credits = mock(CreditService.class);
     audit = mock(AuditService.class);
+    revocation = mock(TokenRevocationService.class);
     request = mock(HttpServletRequest.class);
     response = mock(HttpServletResponse.class);
 
-    handler = new OAuth2LoginSuccessHandler(users, jwt, credits, audit);
+    handler = new OAuth2LoginSuccessHandler(users, jwt, credits, audit, revocation);
     ReflectionTestUtils.setField(handler, "frontendBaseUrl", FRONTEND_BASE_URL);
     ReflectionTestUtils.setField(handler, "cookieSecure", true);
 
@@ -238,5 +241,88 @@ class OAuth2LoginSuccessHandlerTest {
     // nunca deve criar um segundo usuário via save() com um User novo
     verify(users, never()).save(any());
     verify(response).sendRedirect(FRONTEND_BASE_URL + "/dashboard");
+  }
+
+  // ─── 7. Troca de conta Google (relink) ────────────────────────────────────
+  // jwtDecoder não é injetado neste teste unitário (permanece null, como em profile "local"),
+  // então o cookie relink_state usa o formato STUB — mesmo padrão já usado por refresh/mfa tokens.
+
+  private jakarta.servlet.http.Cookie[] relinkCookie(UUID userId) {
+    return new jakarta.servlet.http.Cookie[] {
+      new jakarta.servlet.http.Cookie("relink_state", "STUB_RELINK." + userId + "." + UUID.randomUUID())
+    };
+  }
+
+  @Test
+  void relink_trocaEmailDaContaERevogaSessaoAnterior() throws Exception {
+    UUID userId = UUID.randomUUID();
+    User current = new User();
+    ReflectionTestUtils.setField(current, "id", userId);
+    current.setEmail("conta.antiga@gmail.com");
+    current.setEmailVerified(true);
+
+    when(request.getCookies()).thenReturn(relinkCookie(userId));
+    when(users.findById(userId)).thenReturn(Optional.of(current));
+    when(users.findByEmailIgnoreCase("conta.nova@gmail.com")).thenReturn(Optional.empty());
+
+    OAuth2User principal = oauth2User("conta.nova@gmail.com", "Conta Nova");
+    handler.onAuthenticationSuccess(request, response, authenticationFor(principal));
+
+    ArgumentCaptor<User> captor = ArgumentCaptor.forClass(User.class);
+    verify(users).save(captor.capture());
+    assertThat(captor.getValue().getEmail()).isEqualTo("conta.nova@gmail.com");
+    assertThat(captor.getValue().isEmailVerified()).isTrue();
+
+    // apaga o cookie de relink (uso único) e emite um refresh_token novo
+    verify(response).addCookie(any());
+    verify(response).addHeader(eq("Set-Cookie"), contains("refresh_token="));
+
+    verify(audit)
+        .record(eq(userId), eq("GOOGLE_ACCOUNT_RELINKED"), any(), any(), contains("conta.nova@gmail.com"));
+    verify(response).sendRedirect(FRONTEND_BASE_URL + "/dashboard/security?relink=success");
+    // sem jwtDecoder (profile local) não há como decodificar o refresh_token antigo — não revoga
+    verify(revocation, never()).revoke(any(), any());
+  }
+
+  @Test
+  void relink_emailJaPertenceAOutraConta_rejeitaSemAlterarNada() throws Exception {
+    UUID userId = UUID.randomUUID();
+    UUID outroUserId = UUID.randomUUID();
+    User current = new User();
+    ReflectionTestUtils.setField(current, "id", userId);
+    current.setEmail("conta.antiga@gmail.com");
+
+    User outraConta = new User();
+    ReflectionTestUtils.setField(outraConta, "id", outroUserId);
+    outraConta.setEmail("ja.cadastrado@gmail.com");
+
+    when(request.getCookies()).thenReturn(relinkCookie(userId));
+    when(users.findById(userId)).thenReturn(Optional.of(current));
+    when(users.findByEmailIgnoreCase("ja.cadastrado@gmail.com")).thenReturn(Optional.of(outraConta));
+
+    OAuth2User principal = oauth2User("ja.cadastrado@gmail.com", "Ja Cadastrado");
+    handler.onAuthenticationSuccess(request, response, authenticationFor(principal));
+
+    verify(users, never()).save(any());
+    verify(response).sendRedirect(FRONTEND_BASE_URL + "/dashboard/security?relink=error&reason=in_use");
+    verifyNoInteractions(audit);
+  }
+
+  @Test
+  void relink_paraOMesmoEmailJaVinculado_naoConflitaComSiMesmo() throws Exception {
+    UUID userId = UUID.randomUUID();
+    User current = new User();
+    ReflectionTestUtils.setField(current, "id", userId);
+    current.setEmail("mesma.conta@gmail.com");
+
+    when(request.getCookies()).thenReturn(relinkCookie(userId));
+    when(users.findById(userId)).thenReturn(Optional.of(current));
+    when(users.findByEmailIgnoreCase("mesma.conta@gmail.com")).thenReturn(Optional.of(current));
+
+    OAuth2User principal = oauth2User("mesma.conta@gmail.com", "Mesma Conta");
+    handler.onAuthenticationSuccess(request, response, authenticationFor(principal));
+
+    verify(users).save(any());
+    verify(response).sendRedirect(FRONTEND_BASE_URL + "/dashboard/security?relink=success");
   }
 }

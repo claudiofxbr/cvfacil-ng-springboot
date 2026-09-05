@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { ShieldCheck, ShieldOff, KeyRound, AlertTriangle, Copy, Check, Download, Trash2 } from 'lucide-react';
+import { ShieldCheck, ShieldOff, KeyRound, AlertTriangle, Copy, Check, Download, Trash2, RefreshCw } from 'lucide-react';
 import { useAuthStore } from '@/lib/stores/authStore';
 import { api } from '@/lib/apiClient';
 
@@ -241,6 +241,45 @@ function ChangePasswordSection({ status }) {
   );
 }
 
+// ── Trocar a conta Google vinculada ao login ─────────────────────────────────────
+// Fluxo: pede ao backend um cookie de curta duração (relink_state) amarrado ao
+// usuário logado, depois manda o navegador direto para o Google — o callback
+// OAuth (OAuth2LoginSuccessHandler) só enxerga esse cookie, não este fetch.
+function GoogleAccountSection({ currentEmail }) {
+  const apiBase = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8080';
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+
+  async function startRelink() {
+    setError('');
+    setLoading(true);
+    try {
+      await api.post('/api/auth/google/relink/start', {});
+      window.location.href = `${apiBase}/oauth2/authorization/google?prompt=select_account`;
+    } catch {
+      setError('Não foi possível iniciar a troca. Tente novamente.');
+      setLoading(false);
+    }
+  }
+
+  return (
+    <Card title="Conta Google vinculada" icon={RefreshCw}>
+      <p className="mb-4 text-sm text-gray-600">
+        E-mail de login atual: <span className="font-semibold text-gray-900">{currentEmail}</span>
+      </p>
+      <p className="mb-4 text-xs text-gray-500">
+        Trocar a conta Google escolhe uma nova conta no seletor do Google e passa a usar o e-mail
+        dela para o seu login — a sessão atual é encerrada e você precisa entrar de novo com a conta
+        nova.
+      </p>
+      {error && <p className="mb-2 text-xs text-red-600">{error}</p>}
+      <button onClick={startRelink} disabled={loading} className="btn-primary py-2 disabled:opacity-60">
+        {loading ? 'Redirecionando...' : 'Trocar conta Google'}
+      </button>
+    </Card>
+  );
+}
+
 // ── Exportar meus dados (LGPD Art. 18 / GDPR Art. 15-20) ────────────────────────
 function ExportDataSection() {
   const [loading, setLoading] = useState(false);
@@ -352,6 +391,7 @@ export default function SecurityPage() {
   const user = useAuthStore((s) => s.user);
   const hydrated = useAuthStore((s) => s.hydrated);
   const [status, setStatus] = useState(null);
+  const [relinkNotice, setRelinkNotice] = useState(null); // { type: 'success'|'error', reason }
 
   useEffect(() => {
     if (hydrated && !user) router.push('/login');
@@ -361,6 +401,14 @@ export default function SecurityPage() {
     if (user) loadStatus();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user]);
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const relink = params.get('relink');
+    if (!relink) return;
+    setRelinkNotice({ type: relink, reason: params.get('reason') });
+    router.replace('/dashboard/security');
+  }, [router]);
 
   async function loadStatus() {
     try {
@@ -381,7 +429,20 @@ export default function SecurityPage() {
         <h1 className="font-display text-2xl font-bold text-gray-900">Segurança</h1>
         <p className="text-sm text-gray-500">Gerencie a autenticação em duas etapas e sua senha.</p>
       </div>
+      {relinkNotice?.type === 'success' && (
+        <p className="rounded-md bg-green-50 px-3 py-2 text-sm text-green-700">
+          Conta Google trocada com sucesso — login atualizado para {user.email}.
+        </p>
+      )}
+      {relinkNotice?.type === 'error' && (
+        <p className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">
+          {relinkNotice.reason === 'in_use'
+            ? 'Essa conta Google já está vinculada a outro usuário do CVFacil.NG.'
+            : 'Não foi possível trocar a conta Google. Tente novamente.'}
+        </p>
+      )}
       <MfaSection status={status} onChanged={loadStatus} />
+      <GoogleAccountSection currentEmail={user.email} />
       <ChangePasswordSection status={status} />
       <ExportDataSection />
       {status.role !== 'ROOT_MASTER' && <DeleteAccountSection />}

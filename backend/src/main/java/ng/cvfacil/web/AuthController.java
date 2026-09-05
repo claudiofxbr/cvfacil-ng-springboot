@@ -256,6 +256,35 @@ public class AuthController {
         : ResponseEntity.status(401).build();
   }
 
+  /**
+   * Inicia a troca da conta Google vinculada ao login: emite um token de uso único e curta duração
+   * (5 min) num cookie httpOnly ({@code relink_state}) que {@link
+   * ng.cvfacil.security.OAuth2LoginSuccessHandler} usa, no callback do Google, para saber qual
+   * usuário autenticado pediu a troca — o callback só enxerga cookies, não o header Authorization
+   * desta requisição. O frontend, ao receber 200, redireciona o navegador para {@code
+   * /oauth2/authorization/google?prompt=select_account} (o parâmetro força o Google a exibir o
+   * seletor de contas em vez de logar direto na última conta usada).
+   */
+  @PostMapping("/google/relink/start")
+  public ResponseEntity<Void> startGoogleRelink(
+      @AuthenticationPrincipal Jwt principal, HttpServletRequest http) {
+    UUID userId = resolveUserId(principal, http);
+    if (userId == null) return ResponseEntity.status(401).build();
+
+    String relinkToken = jwt.issueGoogleRelinkToken(userId);
+    ResponseCookie cookie =
+        ResponseCookie.from("relink_state", relinkToken)
+            .httpOnly(true)
+            .secure(cookieSecure)
+            // Lax (não Strict): precisa sobreviver ao redirect que o Google faz de volta para
+            // /login/oauth2/code/google — mesmo padrão do cookie oauth2_auth_request existente.
+            .sameSite("Lax")
+            .path("/")
+            .maxAge(Duration.ofMinutes(5))
+            .build();
+    return ResponseEntity.ok().header("Set-Cookie", cookie.toString()).build();
+  }
+
   /** Estado de segurança da conta logada — alimenta a página /dashboard/security do frontend. */
   @GetMapping("/security-status")
   public ResponseEntity<SecurityStatus> securityStatus(
