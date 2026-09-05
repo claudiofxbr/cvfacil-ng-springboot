@@ -23,6 +23,12 @@
         <java.version>21</java.version>
         <maven.compiler.source>21</maven.compiler.source>
         <maven.compiler.target>21</maven.compiler.target>
+        <!-- CVE-2026-54512 (execucao de codigo arbitrario em jackson-databind): a 2.19.4
+             herdada do BOM do Spring Boot 3.5.12 nao recebeu backport; a serie 2.19.x nao
+             foi corrigida, so 2.18.8+, 2.21.4+ e 3.1.4+. Sobe todo o jackson-bom junto (nao
+             so jackson-databind) para manter databind/annotations/core na mesma versao —
+             misturar versoes do family Jackson quebra o ObjectMapper em runtime. -->
+        <jackson-bom.version>2.21.4</jackson-bom.version>
     </properties>
 
     <dependencyManagement>
