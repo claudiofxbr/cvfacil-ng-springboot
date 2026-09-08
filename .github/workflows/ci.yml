@@ -44,6 +44,11 @@ jobs:
 
       - name: Upload frontend artifact
         uses: actions/upload-artifact@v4
+        # Nada baixa este artefato depois (deploy.yml reconstroi do zero via SSH na
+        # VPS) — não deixar a cota de armazenamento de artefatos do GitHub Actions
+        # (que não recalcula em tempo real após limpeza) bloquear todo o pipeline
+        # por causa de um upload puramente informativo.
+        continue-on-error: true
         with:
           name: frontend-standalone
           path: frontend/.next/standalone
@@ -102,6 +107,11 @@ jobs:
 
       - name: Upload backend artifact
         uses: actions/upload-artifact@v4
+        # Nada baixa este artefato depois (deploy.yml reconstroi do zero via SSH na
+        # VPS) — não deixar a cota de armazenamento de artefatos do GitHub Actions
+        # (que não recalcula em tempo real após limpeza) bloquear todo o pipeline
+        # por causa de um upload puramente informativo.
+        continue-on-error: true
         with:
           name: backend-jar
           path: backend/target/*.jar
