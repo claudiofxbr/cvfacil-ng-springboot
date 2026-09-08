@@ -138,7 +138,16 @@ jobs:
         # hospedado) — ao bater no rate limit, ela nao consegue confirmar elegibilidade de
         # uso gratuito e cai no enforcement de licenca paga ("missing gitleaks license"),
         # mesmo o repo nao precisando de licenca nenhuma para gitleaks em si.
+        #
+        # continue-on-error (decisao do usuario, 08/09): a action tenta subir um artefato
+        # interno (SARIF) mesmo depois do scan real ja ter concluido — sujeito a mesma
+        # cota de armazenamento de artefatos do GitHub Actions, que nao recalcula em tempo
+        # real. Sem isso, um crash de upload (nao um vazamento de verdade) derruba o job
+        # inteiro e bloqueia o deploy. O scan continua rodando e o resultado ("no leaks
+        # found" ou a lista de achados) continua no log — revisar manualmente de vez em
+        # quando, ja que um crash futuro nao vai mais barrar o deploy sozinho.
         uses: gitleaks/gitleaks-action@v2
+        continue-on-error: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
