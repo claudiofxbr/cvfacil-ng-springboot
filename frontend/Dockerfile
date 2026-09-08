@@ -25,6 +25,10 @@ ENV NODE_ENV=production
 RUN addgroup -S cvfacil && adduser -S cvfacil -G cvfacil
 COPY --from=build --chown=cvfacil:cvfacil /app/.next/standalone ./
 COPY --from=build --chown=cvfacil:cvfacil /app/.next/static ./.next/static
+# BUG CORRIGIDO: output 'standalone' do Next.js nao copia public/ sozinho (limitacao
+# documentada da propria Vercel) — todo arquivo estatico em public/ (favicon, robots.txt,
+# arquivos de verificacao de dominio) respondia 404 em producao sem esta linha.
+COPY --from=build --chown=cvfacil:cvfacil /app/public ./public
 USER cvfacil
 
 EXPOSE 3000
