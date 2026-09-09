@@ -57,6 +57,8 @@ class OAuth2LoginSuccessHandlerTest {
 
     when(jwt.issueRefreshToken(any())).thenReturn("STUB_REFRESH.token");
     when(jwt.refreshTtl()).thenReturn(java.time.Duration.ofDays(7));
+    when(jwt.issuePinSetupToken(any())).thenReturn("STUB_PINSETUP.token");
+    when(jwt.issuePinVerifyToken(any())).thenReturn("STUB_PINVERIFY.token");
     when(request.getRemoteAddr()).thenReturn("203.0.113.10");
     when(request.getHeader("User-Agent")).thenReturn("JUnit-Agent");
 
@@ -105,14 +107,16 @@ class OAuth2LoginSuccessHandlerTest {
     verify(audit)
         .record(any(), eq("LOGIN_GOOGLE_SUCCESS"), eq("203.0.113.10"), eq("JUnit-Agent"), isNull());
 
+    // BUG DE SEGURANÇA CORRIGIDO: nenhuma sessão (refresh_token) é emitida direto — mesmo conta
+    // nova precisa passar pelo portão de PIN (aqui, "setup" já que pinHash é null por padrão).
     ArgumentCaptor<String> cookieCaptor = ArgumentCaptor.forClass(String.class);
     verify(response).addHeader(eq("Set-Cookie"), cookieCaptor.capture());
     String cookieHeader = cookieCaptor.getValue();
-    assertThat(cookieHeader).contains("refresh_token=");
+    assertThat(cookieHeader).contains("pin_setup_state=");
     assertThat(cookieHeader).containsIgnoringCase("HttpOnly");
-    assertThat(cookieHeader).contains("SameSite=Strict");
+    assertThat(cookieHeader).doesNotContain("refresh_token=");
 
-    verify(response).sendRedirect(FRONTEND_BASE_URL + "/dashboard");
+    verify(response).sendRedirect(FRONTEND_BASE_URL + "/oauth2/pin");
   }
 
   // ─── 2. Usuário existente com emailVerified=false (bug corrigido) ─────────
@@ -140,7 +144,7 @@ class OAuth2LoginSuccessHandlerTest {
 
     // não é conta nova — sem crédito de cortesia
     verify(credits, never()).grantCourtesyIfEligible(any());
-    verify(response).sendRedirect(FRONTEND_BASE_URL + "/dashboard");
+    verify(response).sendRedirect(FRONTEND_BASE_URL + "/oauth2/pin");
   }
 
   // ─── 3. Usuário existente já verificado ───────────────────────────────────
@@ -163,7 +167,30 @@ class OAuth2LoginSuccessHandlerTest {
     // para criação nem para a promoção de emailVerified)
     verify(users, never()).save(any());
     verify(credits, never()).grantCourtesyIfEligible(any());
-    verify(response).sendRedirect(FRONTEND_BASE_URL + "/dashboard");
+    // pinHash é null por padrão nesse User de teste -> ainda cai no portão de "setup"
+    verify(response)
+        .addHeader(eq("Set-Cookie"), org.mockito.ArgumentMatchers.contains("pin_setup_state="));
+    verify(response).sendRedirect(FRONTEND_BASE_URL + "/oauth2/pin");
+  }
+
+  @Test
+  void usuarioComPinJaCadastrado_caiNoPortaoDeVerificacaoNaoDeSetup() throws Exception {
+    String email = "com.pin@gmail.com";
+    User existing = new User();
+    ReflectionTestUtils.setField(existing, "id", UUID.randomUUID());
+    existing.setEmail(email);
+    existing.setDisplayName("Com Pin");
+    existing.setEmailVerified(true);
+    existing.setPinHash("bcrypt-hash-do-pin");
+
+    when(users.findByEmailIgnoreCase(email)).thenReturn(Optional.of(existing));
+
+    OAuth2User principal = oauth2User(email, "Com Pin");
+    handler.onAuthenticationSuccess(request, response, authenticationFor(principal));
+
+    verify(response)
+        .addHeader(eq("Set-Cookie"), org.mockito.ArgumentMatchers.contains("pin_verify_state="));
+    verify(response).sendRedirect(FRONTEND_BASE_URL + "/oauth2/pin");
   }
 
   // ─── 4. name ausente/vazio: fallback para parte antes do @ ────────────────
@@ -240,7 +267,7 @@ class OAuth2LoginSuccessHandlerTest {
     // já verificado -> não deve salvar (comportamento do caso 3), e sobretudo
     // nunca deve criar um segundo usuário via save() com um User novo
     verify(users, never()).save(any());
-    verify(response).sendRedirect(FRONTEND_BASE_URL + "/dashboard");
+    verify(response).sendRedirect(FRONTEND_BASE_URL + "/oauth2/pin");
   }
 
   // ─── 7. Troca de conta Google (relink) ────────────────────────────────────

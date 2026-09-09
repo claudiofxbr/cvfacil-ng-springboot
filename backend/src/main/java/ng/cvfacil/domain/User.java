@@ -61,6 +61,21 @@ public class User {
   @Column(name = "locked_until")
   private Instant lockedUntil;
 
+  /**
+   * BCrypt hash do PIN de 8 dígitos — segundo fator obrigatório em TODO login/cadastro via Google,
+   * mesmo com sessão já ativa no navegador (ver OAuth2LoginSuccessHandler). {@code null} significa
+   * que a conta ainda não tem PIN — o próximo login com Google interrompe o fluxo para criar um,
+   * antes de liberar qualquer sessão.
+   */
+  @Column(name = "pin_hash", length = 100)
+  private String pinHash;
+
+  @Column(name = "pin_failed_attempts", nullable = false)
+  private int pinFailedAttempts;
+
+  @Column(name = "pin_locked_until")
+  private Instant pinLockedUntil;
+
   /** true somente após confirmação do código TOTP em /api/mfa/confirm — ver MfaService. */
   @Column(name = "mfa_enabled", nullable = false)
   private boolean mfaEnabled;
@@ -170,6 +185,30 @@ public class User {
 
   public void setLockedUntil(Instant t) {
     this.lockedUntil = t;
+  }
+
+  public String getPinHash() {
+    return pinHash;
+  }
+
+  public void setPinHash(String pinHash) {
+    this.pinHash = pinHash;
+  }
+
+  public int getPinFailedAttempts() {
+    return pinFailedAttempts;
+  }
+
+  public void setPinFailedAttempts(int n) {
+    this.pinFailedAttempts = n;
+  }
+
+  public Instant getPinLockedUntil() {
+    return pinLockedUntil;
+  }
+
+  public void setPinLockedUntil(Instant t) {
+    this.pinLockedUntil = t;
   }
 
   public boolean isMfaEnabled() {

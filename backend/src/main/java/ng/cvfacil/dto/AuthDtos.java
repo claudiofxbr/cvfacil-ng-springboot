@@ -59,4 +59,28 @@ public class AuthDtos {
 
   public record SecurityStatus(
       boolean mfaEnabled, long passwordAgeDays, boolean rotationOverdue, String role) {}
+
+  /**
+   * {@code mode}: "setup" (conta sem PIN ainda), "verify" (conta já tem PIN) ou "none" (nenhum
+   * desafio pendente — cookie ausente/expirado, o frontend deve mandar refazer o login).
+   */
+  public record PinStatusResponse(String mode) {}
+
+  public record PinSetupRequest(
+      @NotBlank @Pattern(regexp = "\\d{8}", message = "O PIN deve ter exatamente 8 dígitos")
+          String pin,
+      @NotBlank String pinConfirm) {}
+
+  public record PinVerifyRequest(
+      @NotBlank @Pattern(regexp = "\\d{8}", message = "O PIN deve ter exatamente 8 dígitos")
+          String pin) {}
+
+  public record ChangePinRequest(
+      @NotBlank @Pattern(regexp = "\\d{8}") String currentPin,
+      @NotBlank @Pattern(regexp = "\\d{8}", message = "O PIN deve ter exatamente 8 dígitos")
+          String newPin) {}
+
+  public record ResetPinRequest(@NotBlank String token) {}
+
+  public record PinFailureResponse(String error, Integer remainingAttempts) {}
 }

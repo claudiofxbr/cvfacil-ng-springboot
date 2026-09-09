@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { ShieldCheck, ShieldOff, KeyRound, AlertTriangle, Copy, Check, Download, Trash2, RefreshCw } from 'lucide-react';
+import { ShieldCheck, ShieldOff, KeyRound, AlertTriangle, Copy, Check, Download, Trash2, RefreshCw, Lock } from 'lucide-react';
 import { useAuthStore } from '@/lib/stores/authStore';
 import { api } from '@/lib/apiClient';
 
@@ -283,6 +283,103 @@ function GoogleAccountSection({ currentEmail }) {
   );
 }
 
+// ── PIN de acesso via Google — segundo fator obrigatório em todo login com Google ──
+// Trocar o PIN atual exige o PIN atual (mesmo padrão de ChangePasswordSection). "Esqueci meu
+// PIN" aqui é para quem AINDA tem sessão válida por outro meio (ex: MFA/senha) mas quer resetar
+// o PIN preventivamente — quem já está travado na tela de verificação usa o mesmo link
+// diretamente em /oauth2/pin (ver PinController#forgotPending), sem precisar de sessão.
+function PinSection() {
+  const [form, setForm] = useState({ currentPin: '', newPin: '' });
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+  const [success, setSuccess] = useState(false);
+  const [forgotSent, setForgotSent] = useState(false);
+
+  function onlyDigits(v) {
+    return v.replace(/\D/g, '').slice(0, 8);
+  }
+
+  async function onSubmit(e) {
+    e.preventDefault();
+    setError('');
+    setSuccess(false);
+    if (form.currentPin.length !== 8 || form.newPin.length !== 8) {
+      setError('O PIN deve ter exatamente 8 dígitos.');
+      return;
+    }
+    setLoading(true);
+    try {
+      await api.put('/api/auth/pin', form);
+      setForm({ currentPin: '', newPin: '' });
+      setSuccess(true);
+    } catch {
+      setError('PIN atual incorreto.');
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function onForgot() {
+    setLoading(true);
+    try {
+      await api.post('/api/auth/pin/forgot', {});
+    } finally {
+      setForgotSent(true);
+      setLoading(false);
+    }
+  }
+
+  return (
+    <Card title="PIN de acesso via Google" icon={Lock}>
+      <p className="mb-4 text-xs text-gray-500">
+        Exigido em todo login/cadastro com Google, mesmo com a sessão do Google já ativa no
+        navegador — protege sua conta em computadores/navegadores compartilhados.
+      </p>
+      <form onSubmit={onSubmit} className="space-y-3">
+        <div>
+          <label className="mb-1 block text-xs font-semibold text-gray-600">PIN atual</label>
+          <input
+            inputMode="numeric"
+            required
+            value={form.currentPin}
+            onChange={(e) => setForm({ ...form, currentPin: onlyDigits(e.target.value) })}
+            className="w-40 rounded-md border border-gray-300 px-3 py-2 text-center text-sm tracking-widest"
+          />
+        </div>
+        <div>
+          <label className="mb-1 block text-xs font-semibold text-gray-600">Novo PIN (8 dígitos)</label>
+          <input
+            inputMode="numeric"
+            required
+            value={form.newPin}
+            onChange={(e) => setForm({ ...form, newPin: onlyDigits(e.target.value) })}
+            className="w-40 rounded-md border border-gray-300 px-3 py-2 text-center text-sm tracking-widest"
+          />
+        </div>
+        {error && <p className="text-xs text-red-600">{error}</p>}
+        {success && <p className="text-xs text-green-600">PIN alterado com sucesso.</p>}
+        <div className="flex flex-wrap items-center gap-3">
+          <button type="submit" disabled={loading} className="btn-primary py-2 disabled:opacity-60">
+            {loading ? 'Salvando...' : 'Salvar novo PIN'}
+          </button>
+          {forgotSent ? (
+            <span className="text-xs text-green-600">E-mail de redefinição enviado.</span>
+          ) : (
+            <button
+              type="button"
+              onClick={onForgot}
+              disabled={loading}
+              className="text-xs text-gray-500 hover:underline"
+            >
+              Esqueci meu PIN
+            </button>
+          )}
+        </div>
+      </form>
+    </Card>
+  );
+}
+
 // ── Exportar meus dados (LGPD Art. 18 / GDPR Art. 15-20) ────────────────────────
 function ExportDataSection() {
   const [loading, setLoading] = useState(false);
@@ -445,6 +542,7 @@ export default function SecurityPage() {
         </p>
       )}
       <MfaSection status={status} onChanged={loadStatus} />
+      <PinSection />
       <GoogleAccountSection currentEmail={user.email} />
       <ChangePasswordSection status={status} />
       <ExportDataSection />

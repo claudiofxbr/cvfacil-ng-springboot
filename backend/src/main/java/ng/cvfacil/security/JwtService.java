@@ -208,6 +208,66 @@ public class JwtService {
     }
   }
 
+  /**
+   * Token de curta duração (5 min) emitido depois que o Google autentica um usuário SEM PIN ainda
+   * cadastrado — carrega o {@code userId} através do redirect para {@code /oauth2/pin} (cookie
+   * httpOnly {@code pin_setup_state}) até o PIN de 8 dígitos ser criado. Uso único: {@link
+   * ng.cvfacil.web.PinController} apaga o cookie assim que consome o token.
+   */
+  public String issuePinSetupToken(UUID userId) {
+    if (signer == null) {
+      return "STUB_PINSETUP." + userId + "." + UUID.randomUUID();
+    }
+    try {
+      Instant now = Instant.now();
+      JWTClaimsSet claims =
+          new JWTClaimsSet.Builder()
+              .issuer(issuer)
+              .subject(userId.toString())
+              .claim("type", "pin_setup")
+              .issueTime(Date.from(now))
+              .expirationTime(Date.from(now.plus(Duration.ofMinutes(5))))
+              .jwtID(UUID.randomUUID().toString())
+              .build();
+      SignedJWT jwt = new SignedJWT(new JWSHeader(JWSAlgorithm.RS256), claims);
+      jwt.sign(signer);
+      return jwt.serialize();
+    } catch (Exception e) {
+      throw new IllegalStateException(
+          "[JwtService] Erro ao assinar pin setup token: " + e.getMessage(), e);
+    }
+  }
+
+  /**
+   * Token de curta duração (5 min) emitido depois que o Google autentica um usuário que JÁ tem PIN
+   * cadastrado — carrega o {@code userId} através do redirect para {@code /oauth2/pin} (cookie
+   * httpOnly {@code pin_verify_state}) até o PIN ser confirmado. Uso único: {@link
+   * ng.cvfacil.web.PinController} apaga o cookie assim que consome o token.
+   */
+  public String issuePinVerifyToken(UUID userId) {
+    if (signer == null) {
+      return "STUB_PINVERIFY." + userId + "." + UUID.randomUUID();
+    }
+    try {
+      Instant now = Instant.now();
+      JWTClaimsSet claims =
+          new JWTClaimsSet.Builder()
+              .issuer(issuer)
+              .subject(userId.toString())
+              .claim("type", "pin_verify")
+              .issueTime(Date.from(now))
+              .expirationTime(Date.from(now.plus(Duration.ofMinutes(5))))
+              .jwtID(UUID.randomUUID().toString())
+              .build();
+      SignedJWT jwt = new SignedJWT(new JWSHeader(JWSAlgorithm.RS256), claims);
+      jwt.sign(signer);
+      return jwt.serialize();
+    } catch (Exception e) {
+      throw new IllegalStateException(
+          "[JwtService] Erro ao assinar pin verify token: " + e.getMessage(), e);
+    }
+  }
+
   /** {@code true} quando a chave privada está carregada e tokens RS256 reais são emitidos. */
   public boolean isRealSigningActive() {
     return signer != null;

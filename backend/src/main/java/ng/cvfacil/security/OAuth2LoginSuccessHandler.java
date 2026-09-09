@@ -121,17 +121,6 @@ public class OAuth2LoginSuccessHandler implements AuthenticationSuccessHandler {
       user = users.save(user);
     }
 
-    String refresh = jwt.issueRefreshToken(user.getId());
-    ResponseCookie cookie =
-        ResponseCookie.from("refresh_token", refresh)
-            .httpOnly(true)
-            .secure(cookieSecure)
-            .sameSite("Strict")
-            .path("/")
-            .maxAge(jwt.refreshTtl())
-            .build();
-    response.addHeader("Set-Cookie", cookie.toString());
-
     audit.record(
         user.getId(),
         "LOGIN_GOOGLE_SUCCESS",
@@ -139,7 +128,39 @@ public class OAuth2LoginSuccessHandler implements AuthenticationSuccessHandler {
         request.getHeader("User-Agent"),
         null);
 
-    response.sendRedirect(frontendBaseUrl + "/dashboard");
+    // BUG DE SEGURANÇA CORRIGIDO: até aqui, uma sessão completa (refresh_token) era emitida na
+    // hora, confiando só na sessão Google já ativa no navegador. Como o Google frequentemente
+    // reautentica silenciosamente (sem pedir senha de novo) quando já há uma sessão ativa,
+    // qualquer pessoa com acesso físico ao navegador do dono da conta — computador
+    // compartilhado, navegador destravado — conseguia entrar direto na conta do CVFacil.NG
+    // vinculada, sem provar nada que só o dono soubesse. Agora, a sessão real só é emitida
+    // depois de um PIN de 8 dígitos (próprio do CVFacil.NG, nunca do Google) ser criado (conta
+    // sem PIN ainda) ou confirmado (conta já com PIN) em /oauth2/pin — ver PinController.
+    gateByPin(user, request, response);
+  }
+
+  /**
+   * Redireciona para a etapa de PIN em vez de emitir sessão direto — grava o cookie de desafio
+   * (setup ou verify, dependendo se a conta já tem PIN) que {@link ng.cvfacil.web.PinController} lê
+   * no passo seguinte. Aplica-se a TODO login/cadastro via Google, sem exceção (inclusive conta
+   * recém-criada nesta mesma requisição).
+   */
+  private void gateByPin(User user, HttpServletRequest request, HttpServletResponse response)
+      throws IOException {
+    boolean needsSetup = user.getPinHash() == null;
+    String token =
+        needsSetup ? jwt.issuePinSetupToken(user.getId()) : jwt.issuePinVerifyToken(user.getId());
+    String cookieName = needsSetup ? "pin_setup_state" : "pin_verify_state";
+    ResponseCookie cookie =
+        ResponseCookie.from(cookieName, token)
+            .httpOnly(true)
+            .secure(cookieSecure)
+            .sameSite("Lax")
+            .path("/")
+            .maxAge(java.time.Duration.ofMinutes(5))
+            .build();
+    response.addHeader("Set-Cookie", cookie.toString());
+    response.sendRedirect(frontendBaseUrl + "/oauth2/pin");
   }
 
   /**
