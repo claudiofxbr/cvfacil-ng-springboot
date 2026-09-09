@@ -210,8 +210,8 @@ public class JwtService {
 
   /**
    * Token de curta duração (5 min) emitido depois que o Google autentica um usuário SEM PIN ainda
-   * cadastrado — carrega o {@code userId} através do redirect para {@code /oauth2/pin} (cookie
-   * httpOnly {@code pin_setup_state}) até o PIN de 8 dígitos ser criado. Uso único: {@link
+   * cadastrado — carrega o {@code userId} através do redirect para {@code /pin} (cookie httpOnly
+   * {@code pin_setup_state}) até o PIN de 8 dígitos ser criado. Uso único: {@link
    * ng.cvfacil.web.PinController} apaga o cookie assim que consome o token.
    */
   public String issuePinSetupToken(UUID userId) {
@@ -240,8 +240,8 @@ public class JwtService {
 
   /**
    * Token de curta duração (5 min) emitido depois que o Google autentica um usuário que JÁ tem PIN
-   * cadastrado — carrega o {@code userId} através do redirect para {@code /oauth2/pin} (cookie
-   * httpOnly {@code pin_verify_state}) até o PIN ser confirmado. Uso único: {@link
+   * cadastrado — carrega o {@code userId} através do redirect para {@code /pin} (cookie httpOnly
+   * {@code pin_verify_state}) até o PIN ser confirmado. Uso único: {@link
    * ng.cvfacil.web.PinController} apaga o cookie assim que consome o token.
    */
   public String issuePinVerifyToken(UUID userId) {

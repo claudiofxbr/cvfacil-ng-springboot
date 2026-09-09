@@ -34,8 +34,8 @@ import org.springframework.web.bind.annotation.*;
 /**
  * PIN de 8 dígitos — segundo fator obrigatório em todo login/cadastro via Google, mesmo com sessão
  * já ativa no navegador. Ver {@link ng.cvfacil.security.OAuth2LoginSuccessHandler} para o ponto que
- * redireciona para {@code /oauth2/pin} em vez de emitir sessão direto, e {@link PinService} para a
- * lógica de hash/bloqueio/reset.
+ * redireciona para {@code /pin} em vez de emitir sessão direto, e {@link PinService} para a lógica
+ * de hash/bloqueio/reset.
  *
  * <p>Os endpoints de setup/verify NUNCA confiam em identidade vinda do corpo da requisição — o
  * usuário é sempre resolvido a partir do cookie httpOnly ({@code pin_setup_state}/{@code

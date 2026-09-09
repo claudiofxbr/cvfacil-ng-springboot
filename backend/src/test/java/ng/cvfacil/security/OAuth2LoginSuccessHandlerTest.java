@@ -116,7 +116,7 @@ class OAuth2LoginSuccessHandlerTest {
     assertThat(cookieHeader).containsIgnoringCase("HttpOnly");
     assertThat(cookieHeader).doesNotContain("refresh_token=");
 
-    verify(response).sendRedirect(FRONTEND_BASE_URL + "/oauth2/pin");
+    verify(response).sendRedirect(FRONTEND_BASE_URL + "/pin");
   }
 
   // ─── 2. Usuário existente com emailVerified=false (bug corrigido) ─────────
@@ -144,7 +144,7 @@ class OAuth2LoginSuccessHandlerTest {
 
     // não é conta nova — sem crédito de cortesia
     verify(credits, never()).grantCourtesyIfEligible(any());
-    verify(response).sendRedirect(FRONTEND_BASE_URL + "/oauth2/pin");
+    verify(response).sendRedirect(FRONTEND_BASE_URL + "/pin");
   }
 
   // ─── 3. Usuário existente já verificado ───────────────────────────────────
@@ -170,7 +170,7 @@ class OAuth2LoginSuccessHandlerTest {
     // pinHash é null por padrão nesse User de teste -> ainda cai no portão de "setup"
     verify(response)
         .addHeader(eq("Set-Cookie"), org.mockito.ArgumentMatchers.contains("pin_setup_state="));
-    verify(response).sendRedirect(FRONTEND_BASE_URL + "/oauth2/pin");
+    verify(response).sendRedirect(FRONTEND_BASE_URL + "/pin");
   }
 
   @Test
@@ -190,7 +190,7 @@ class OAuth2LoginSuccessHandlerTest {
 
     verify(response)
         .addHeader(eq("Set-Cookie"), org.mockito.ArgumentMatchers.contains("pin_verify_state="));
-    verify(response).sendRedirect(FRONTEND_BASE_URL + "/oauth2/pin");
+    verify(response).sendRedirect(FRONTEND_BASE_URL + "/pin");
   }
 
   // ─── 4. name ausente/vazio: fallback para parte antes do @ ────────────────
@@ -267,7 +267,7 @@ class OAuth2LoginSuccessHandlerTest {
     // já verificado -> não deve salvar (comportamento do caso 3), e sobretudo
     // nunca deve criar um segundo usuário via save() com um User novo
     verify(users, never()).save(any());
-    verify(response).sendRedirect(FRONTEND_BASE_URL + "/oauth2/pin");
+    verify(response).sendRedirect(FRONTEND_BASE_URL + "/pin");
   }
 
   // ─── 7. Troca de conta Google (relink) ────────────────────────────────────

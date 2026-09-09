@@ -135,7 +135,7 @@ public class OAuth2LoginSuccessHandler implements AuthenticationSuccessHandler {
     // compartilhado, navegador destravado — conseguia entrar direto na conta do CVFacil.NG
     // vinculada, sem provar nada que só o dono soubesse. Agora, a sessão real só é emitida
     // depois de um PIN de 8 dígitos (próprio do CVFacil.NG, nunca do Google) ser criado (conta
-    // sem PIN ainda) ou confirmado (conta já com PIN) em /oauth2/pin — ver PinController.
+    // sem PIN ainda) ou confirmado (conta já com PIN) em /pin — ver PinController.
     gateByPin(user, request, response);
   }
 
@@ -160,7 +160,7 @@ public class OAuth2LoginSuccessHandler implements AuthenticationSuccessHandler {
             .maxAge(java.time.Duration.ofMinutes(5))
             .build();
     response.addHeader("Set-Cookie", cookie.toString());
-    response.sendRedirect(frontendBaseUrl + "/oauth2/pin");
+    response.sendRedirect(frontendBaseUrl + "/pin");
   }
 
   /**
