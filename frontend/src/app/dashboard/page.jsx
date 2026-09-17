@@ -473,11 +473,10 @@ function ImportTab({ router }) {
   const [fileObj,     setFileObj]     = useState(null);
   const [rawText,     setRawText]     = useState('');
   const [errorMsg,    setErrorMsg]    = useState('');
-  // Default = 'onyxExecutive' (variante 'minimal', sem <header>/<aside> coloridos)
-  // — evita o layout cair em navyClassic/crimsonImpact/forestPro/magentaVivid/
-  // roseBold/lilacSoft, cujas variantes header/band/split tem cabecalho invisivel
-  // quando o preview herda [data-theme] header/aside do app-shell (ver globals.css).
-  const [layoutId,    setLayoutId]    = useState('onyxExecutive');
+  // Default do seletor de layout na aba "Importar com IA" — mesmo critério do
+  // default do editor (`dashboard/editor/page.jsx`): um id real dos 6
+  // templates fixos, não mais um placeholder.
+  const [layoutId,    setLayoutId]    = useState('corporate-blue-split');
   const [usedAI,      setUsedAI]      = useState(false);
   // aiFailReason: null | 'no-key' | 'offline' | 'auth' | 'server' | 'unknown'
   const [aiFailReason, setAiFailReason] = useState(null);

@@ -486,7 +486,11 @@ function EditorContent() {
   const saveResume   = useResumeListStore((s) => s.saveResume);
   const getResume    = useResumeListStore((s) => s.getResume);
 
-  const layoutId     = searchParams.get('layout') || 'navyClassic';
+  // Default para acesso direto ao editor sem `?layout=` na URL (ex.: link
+  // antigo, digitado à mão). `getLayout` cai em `LAYOUTS[0]` para qualquer id
+  // desconhecido de qualquer forma, mas usar um id real aqui evita depender
+  // desse fallback no caminho mais comum.
+  const layoutId     = searchParams.get('layout') || 'corporate-blue-split';
   const resumeId     = searchParams.get('resumeId') || null;
   const layout       = getLayout(layoutId);
 

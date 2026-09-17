@@ -1,124 +1,142 @@
 /**
- * CVFacil.NG — Paleta oficial dos 9 layouts de currículo
- * Todas as combinações foram validadas para contraste WCAG 2.1 AA ou AAA
- * sobre fundo branco (#FFFFFF). Ver Tabela 2.2.1 do PRD.
+ * CVFacil.NG — Paletas dos 6 templates fixos de currículo.
+ *
+ * O antigo sistema paramétrico de 9 layouts (tema + variante) foi removido e
+ * substituído por 6 templates fixos e independentes (componentes próprios em
+ * `components/layouts/`, um por id). Cada entrada aqui descreve só a
+ * identidade de cor do template — `primary`/`secondary`/`onPrimary`/
+ * `onSecondary` são as duas cores que o sistema ortogonal de paletas escuras
+ * (`DARK_PALETTES`/`applyPalette`, abaixo) pode sobrescrever; o resto do
+ * design de cada template (fundos, gradientes, tipografia) fica embutido no
+ * próprio componente e não muda com a paleta.
+ *
+ * `contrastRatio`/`wcag` são informativos (contraste de `primary` sobre
+ * papel branco, aproximado) — mostrados como selo na galeria, não uma
+ * certificação de acessibilidade estrita do template inteiro.
  */
 
 export const LAYOUT_THEMES = Object.freeze({
-  onyxExecutive: {
-    id: 'onyxExecutive',
-    name: { 'pt-BR': 'Onyx Executive', 'en-US': 'Onyx Executive', 'es-ES': 'Onyx Executive' },
-    concept: { 'pt-BR': 'Minimalista e corporativo', 'en-US': 'Minimal and corporate', 'es-ES': 'Minimalista y corporativo' },
-    primary: '#0A0A0A',
-    secondary: '#E5E7EB',
+  'corporate-blue-split': {
+    id: 'corporate-blue-split',
+    name: { 'pt-BR': 'Corporativo Azul Split', 'en-US': 'Corporate Blue Split', 'es-ES': 'Corporativo Azul Dividido' },
+    concept: {
+      'pt-BR': 'Header dividido com foto e gradiente azul — visual executivo e direto.',
+      'en-US': 'Split header with photo and blue gradient — direct executive look.',
+      'es-ES': 'Encabezado dividido con foto y degradado azul — look ejecutivo directo.',
+    },
+    primary: '#2C5AA0',
+    secondary: '#1E3F73',
     onPrimary: '#FFFFFF',
-    onSecondary: '#0A0A0A',
-    contrastRatio: '19.6:1',
-    wcag: 'AAA',
-    tags: ['Executive', 'Clássico'],
-  },
-  navyClassic: {
-    id: 'navyClassic',
-    name: { 'pt-BR': 'Navy Classic', 'en-US': 'Navy Classic', 'es-ES': 'Navy Classic' },
-    concept: { 'pt-BR': 'Clássico formal', 'en-US': 'Formal classic', 'es-ES': 'Clásico formal' },
-    primary: '#0B2545',
-    secondary: '#D8E3F2',
-    onPrimary: '#FFFFFF',
-    onSecondary: '#0B2545',
-    contrastRatio: '14.2:1',
-    wcag: 'AAA',
-    tags: ['Corporativo', 'Clássico'],
-  },
-  goldPrestige: {
-    id: 'goldPrestige',
-    name: { 'pt-BR': 'Gold Prestige', 'en-US': 'Gold Prestige', 'es-ES': 'Gold Prestige' },
-    concept: { 'pt-BR': 'Premium e elegante', 'en-US': 'Premium and elegant', 'es-ES': 'Premium y elegante' },
-    primary: '#B8860B',
-    secondary: '#F5E9C9',
-    onPrimary: '#0A0A0A',
-    onSecondary: '#5A3E04',
-    contrastRatio: '4.9:1',
+    onSecondary: '#FFFFFF',
+    contrastRatio: '6.8:1',
     wcag: 'AA',
-    tags: ['Premium', 'Criativo'],
+    tags: ['corporativo', 'executivo', 'azul', 'foto', 'gestão'],
   },
-  forestPro: {
-    id: 'forestPro',
-    name: { 'pt-BR': 'Forest Pro', 'en-US': 'Forest Pro', 'es-ES': 'Forest Pro' },
-    concept: { 'pt-BR': 'Natural e confiável', 'en-US': 'Natural and trustworthy', 'es-ES': 'Natural y confiable' },
-    primary: '#0F3D2E',
-    secondary: '#D1E7DD',
+  'fashion-editorial-dark': {
+    id: 'fashion-editorial-dark',
+    name: { 'pt-BR': 'Editorial Dark Fashion', 'en-US': 'Fashion Editorial Dark', 'es-ES': 'Editorial Moda Oscuro' },
+    concept: {
+      'pt-BR': 'Fundo escuro, nome vertical e acentos vermelhos — editorial de moda/criativo.',
+      'en-US': 'Dark background, vertical name and red accents — fashion/creative editorial.',
+      'es-ES': 'Fondo oscuro, nombre vertical y acentos rojos — editorial de moda/creativo.',
+    },
+    primary: '#E8342A',
+    secondary: '#FFFFFF',
     onPrimary: '#FFFFFF',
-    onSecondary: '#0F3D2E',
-    contrastRatio: '13.1:1',
-    wcag: 'AAA',
-    tags: ['Sustentável', 'Corporativo'],
+    onSecondary: '#111111',
+    contrastRatio: '4.2:1',
+    wcag: 'AA',
+    tags: ['criativo', 'moda', 'escuro', 'editorial', 'design'],
   },
-  roseBold: {
-    id: 'roseBold',
-    name: { 'pt-BR': 'Rose Bold', 'en-US': 'Rose Bold', 'es-ES': 'Rose Bold' },
-    concept: { 'pt-BR': 'Criativo e moderno', 'en-US': 'Creative and modern', 'es-ES': 'Creativo y moderno' },
-    primary: '#9D174D',
-    secondary: '#FCE7F3',
+  'concrete-editorial-grayscale': {
+    id: 'concrete-editorial-grayscale',
+    name: { 'pt-BR': 'Editorial Concreto Grayscale', 'en-US': 'Concrete Editorial Grayscale', 'es-ES': 'Editorial Concreto Escala de Grises' },
+    concept: {
+      'pt-BR': 'Tipografia enorme, foto em preto e branco, grid editorial em tons de cinza.',
+      'en-US': 'Bold typography, black-and-white photo, editorial grayscale grid.',
+      'es-ES': 'Tipografía enorme, foto en blanco y negro, grid editorial en grises.',
+    },
+    primary: '#111111',
+    secondary: '#333333',
     onPrimary: '#FFFFFF',
-    onSecondary: '#9D174D',
-    contrastRatio: '8.9:1',
+    onSecondary: '#FFFFFF',
+    contrastRatio: '18.9:1',
     wcag: 'AAA',
-    tags: ['Criativo', 'Moderno'],
+    tags: ['editorial', 'minimalista', 'preto e branco', 'tipografia', 'design'],
   },
-  graphiteNeutral: {
-    id: 'graphiteNeutral',
-    name: { 'pt-BR': 'Graphite Neutral', 'en-US': 'Graphite Neutral', 'es-ES': 'Graphite Neutral' },
-    concept: { 'pt-BR': 'Técnico e neutro', 'en-US': 'Technical and neutral', 'es-ES': 'Técnico y neutral' },
-    primary: '#374151',
-    secondary: '#F3F4F6',
+  'legal-black-pills': {
+    id: 'legal-black-pills',
+    name: { 'pt-BR': 'Jurídico Black Pills', 'en-US': 'Legal Black Pills', 'es-ES': 'Legal Píldoras Negras' },
+    concept: {
+      'pt-BR': 'Cartões pretos arredondados e pílulas de data — sóbrio, ideal para carreiras jurídicas/formais.',
+      'en-US': 'Rounded black cards and date pills — sober, ideal for legal/formal careers.',
+      'es-ES': 'Tarjetas negras redondeadas y píldoras de fecha — sobrio, ideal para carreras legales.',
+    },
+    primary: '#0A0A0A',
+    secondary: '#333333',
     onPrimary: '#FFFFFF',
-    onSecondary: '#111827',
-    contrastRatio: '9.6:1',
+    onSecondary: '#FFFFFF',
+    contrastRatio: '20.2:1',
     wcag: 'AAA',
-    tags: ['Tech', 'Neutro'],
+    tags: ['jurídico', 'formal', 'sóbrio', 'preto', 'advocacia'],
   },
-  crimsonImpact: {
-    id: 'crimsonImpact',
-    name: { 'pt-BR': 'Crimson Impact', 'en-US': 'Crimson Impact', 'es-ES': 'Crimson Impact' },
-    concept: { 'pt-BR': 'Assertivo e visível', 'en-US': 'Assertive and visible', 'es-ES': 'Asertivo y visible' },
-    primary: '#7F1D1D',
-    secondary: '#FEE2E2',
+  'navy-sidebar-engineer': {
+    id: 'navy-sidebar-engineer',
+    name: { 'pt-BR': 'Sidebar Navy Engenharia', 'en-US': 'Navy Sidebar Engineer', 'es-ES': 'Barra Lateral Naval Ingeniería' },
+    concept: {
+      'pt-BR': 'Sidebar azul-marinho com foto e contato, corpo claro — técnico e organizado.',
+      'en-US': 'Navy sidebar with photo and contact, light body — technical and organized.',
+      'es-ES': 'Barra lateral azul marino con foto y contacto, cuerpo claro — técnico y organizado.',
+    },
+    primary: '#1E3A5F',
+    secondary: '#A9C6E0',
     onPrimary: '#FFFFFF',
-    onSecondary: '#7F1D1D',
-    contrastRatio: '10.4:1',
+    onSecondary: '#1E3A5F',
+    contrastRatio: '11.5:1',
     wcag: 'AAA',
-    tags: ['Vendas', 'Liderança'],
+    tags: ['engenharia', 'técnico', 'sidebar', 'azul-marinho', 'ti'],
   },
-  magentaVivid: {
-    id: 'magentaVivid',
-    name: { 'pt-BR': 'Magenta Vivid', 'en-US': 'Magenta Vivid', 'es-ES': 'Magenta Vivid' },
-    concept: { 'pt-BR': 'Inovador e criativo', 'en-US': 'Innovative and creative', 'es-ES': 'Innovador y creativo' },
-    primary: '#86198F',
-    secondary: '#F5D0FE',
+  'teal-rounded-circles': {
+    id: 'teal-rounded-circles',
+    name: { 'pt-BR': 'Teal Círculos Arredondados', 'en-US': 'Teal Rounded Circles', 'es-ES': 'Verde Azulado Círculos Redondeados' },
+    concept: {
+      'pt-BR': 'Foto em moldura circular sobreposta, pílulas verde-azuladas — moderno e amigável.',
+      'en-US': 'Overlapping circular photo frame, teal pills — modern and friendly.',
+      'es-ES': 'Foto en marco circular superpuesto, píldoras verde azulado — moderno y amigable.',
+    },
+    primary: '#16413D',
+    secondary: '#FFFFFF',
     onPrimary: '#FFFFFF',
-    onSecondary: '#86198F',
-    contrastRatio: '8.1:1',
+    onSecondary: '#16413D',
+    contrastRatio: '11.3:1',
     wcag: 'AAA',
-    tags: ['Criativo', 'Moderno'],
-  },
-  lilacSoft: {
-    id: 'lilacSoft',
-    name: { 'pt-BR': 'Lilac Soft', 'en-US': 'Lilac Soft', 'es-ES': 'Lilac Soft' },
-    concept: { 'pt-BR': 'Sofisticado e calmo', 'en-US': 'Sophisticated and calm', 'es-ES': 'Sofisticado y calmo' },
-    primary: '#5B21B6',
-    secondary: '#EDE9FE',
-    onPrimary: '#FFFFFF',
-    onSecondary: '#5B21B6',
-    contrastRatio: '9.8:1',
-    wcag: 'AAA',
-    tags: ['Sofisticado', 'Moderno'],
+    tags: ['moderno', 'amigável', 'verde-azulado', 'círculos', 'design'],
   },
 });
 
 export const LAYOUT_IDS = Object.keys(LAYOUT_THEMES);
 
+/**
+ * Tema neutro de fallback — rede de segurança para um id desconhecido (ex.:
+ * link/currículo salvo com um layoutId do sistema antigo removido). Decisão:
+ * `getLayout`/`getTheme` nunca devem lançar nem renderizar `undefined` para
+ * esse caso. Não é um dos 6 templates novos.
+ */
+const FALLBACK_THEME = Object.freeze({
+  id: 'fallback',
+  name: { 'pt-BR': 'Padrão', 'en-US': 'Default', 'es-ES': 'Predeterminado' },
+  concept: { 'pt-BR': '', 'en-US': '', 'es-ES': '' },
+  primary: '#374151',
+  secondary: '#F3F4F6',
+  onPrimary: '#FFFFFF',
+  onSecondary: '#111827',
+  contrastRatio: '9.6:1',
+  wcag: 'AAA',
+  tags: [],
+});
+
 export function getTheme(id) {
-  return LAYOUT_THEMES[id] ?? LAYOUT_THEMES.navyClassic;
+  return LAYOUT_THEMES[id] ?? FALLBACK_THEME;
 }
 
 /**
