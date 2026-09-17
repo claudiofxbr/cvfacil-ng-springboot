@@ -296,6 +296,27 @@ class AIImportServiceTest {
             + "[{\"text\":\"{\\\"fullName\\\":\\\"Maria\\\"}\"}]}}]}");
   }
 
+  @Test
+  void callGemini_503PersistenteComRetryAfterZero_esgota5TentativasELancaMensagemDeSobrecarga()
+      throws Exception {
+    java.util.concurrent.atomic.AtomicInteger requestCount =
+        new java.util.concurrent.atomic.AtomicInteger(0);
+    withStubServerComHeaders(
+        (status, body) -> {
+          configurarServicoParaTeste("gemini", status, body);
+          assertThatThrownBy(() -> service.parseWithAI("curriculo"))
+              .isInstanceOf(AIProviderException.class)
+              .hasMessageContaining("temporariamente sobrecarregado")
+              .satisfies(e -> assertThat(((AIProviderException) e).getHttpStatus()).isEqualTo(503));
+          // 5 tentativas (era 3) — confirma que o limite foi elevado, nao apenas mantido
+          assertThat(requestCount.get()).isEqualTo(5);
+        },
+        503,
+        "{\"error\":\"UNAVAILABLE\"}",
+        java.util.Map.of("Retry-After", "0"),
+        requestCount);
+  }
+
   // ── parseWithAI / callOpenAI e callAnthropic ─────────────────────────────
 
   @Test
@@ -343,6 +364,42 @@ class AIImportServiceTest {
     httpServer.createContext(
         "/",
         exchange -> {
+          byte[] resp = body.getBytes(StandardCharsets.UTF_8);
+          exchange.sendResponseHeaders(status, resp.length);
+          try (var os = exchange.getResponseBody()) {
+            os.write(resp);
+          }
+        });
+    httpServer.start();
+    try {
+      ReflectionTestUtils.setField(
+          service, "httpClient", HttpClient.newBuilder().build(), HttpClient.class);
+      String base = "http://localhost:" + httpServer.getAddress().getPort();
+      ReflectionTestUtils.setField(service, "baseUrl", base);
+      test.run(status, body);
+    } finally {
+      httpServer.stop(0);
+    }
+  }
+
+  /**
+   * Variante de withStubServer que permite definir headers de resposta (ex.: Retry-After) e contar
+   * quantas requisicoes o servico realmente fez — usada para validar o backoff/retry de callGemini
+   * sem depender de tempo real de espera (Retry-After: 0 mantem o teste rapido).
+   */
+  private void withStubServerComHeaders(
+      StubServerTest test,
+      int status,
+      String body,
+      java.util.Map<String, String> headers,
+      java.util.concurrent.atomic.AtomicInteger requestCount)
+      throws Exception {
+    HttpServer httpServer = HttpServer.create(new InetSocketAddress("localhost", 0), 0);
+    httpServer.createContext(
+        "/",
+        exchange -> {
+          requestCount.incrementAndGet();
+          headers.forEach((k, v) -> exchange.getResponseHeaders().add(k, v));
           byte[] resp = body.getBytes(StandardCharsets.UTF_8);
           exchange.sendResponseHeaders(status, resp.length);
           try (var os = exchange.getResponseBody()) {
