@@ -22,6 +22,10 @@ const securityHeaders = [
       "style-src 'self' 'unsafe-inline'",
       "img-src 'self' data: blob:",
       "font-src 'self' data:",
+      // pdfjs-dist roda a extração de PDF em um Web Worker servido pelo próprio
+      // bundle do Next.js (mesma origem) — sem isso alguns navegadores bloqueiam
+      // via CSP default-src.
+      "worker-src 'self' blob:",
       // Em dev o webpack usa websocket para HMR (ws://localhost:3000)
       isDev
         ? "connect-src 'self' ws://localhost:3000 " + (process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8080')

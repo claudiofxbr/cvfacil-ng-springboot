@@ -566,9 +566,14 @@ function ImportTab({ router }) {
       if (!text.trim()) {
         const isPdf  = file.name.toLowerCase().endsWith('.pdf');
         const isDocx = file.name.toLowerCase().endsWith('.docx');
-        if (isPdf || isDocx) {
+        if (isPdf) {
           setErrorMsg(
-            `${isPdf ? 'PDF' : 'DOCX'} comprimido — extração local não é possível sem IA. ` +
+            'Não foi possível extrair texto deste PDF automaticamente (provavelmente é um PDF ' +
+            'escaneado/imagem, sem camada de texto). Cole o conteúdo do currículo na caixa abaixo.'
+          );
+        } else if (isDocx) {
+          setErrorMsg(
+            'DOCX comprimido — extração local não é possível sem IA. ' +
             'Cole o texto do currículo na caixa abaixo ou configure a IA no servidor.'
           );
         } else {

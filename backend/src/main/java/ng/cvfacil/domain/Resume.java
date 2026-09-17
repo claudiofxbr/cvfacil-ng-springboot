@@ -37,6 +37,9 @@ public class Resume {
   @Column(name = "updated_at", nullable = false)
   private Instant updatedAt = Instant.now();
 
+  @Column(name = "deleted_at")
+  private Instant deletedAt;
+
   @PreUpdate
   void onUpdate() {
     this.updatedAt = Instant.now();
@@ -100,5 +103,13 @@ public class Resume {
 
   public Instant getUpdatedAt() {
     return updatedAt;
+  }
+
+  public Instant getDeletedAt() {
+    return deletedAt;
+  }
+
+  public void setDeletedAt(Instant deletedAt) {
+    this.deletedAt = deletedAt;
   }
 }

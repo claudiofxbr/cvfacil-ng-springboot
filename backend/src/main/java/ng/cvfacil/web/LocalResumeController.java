@@ -57,6 +57,34 @@ public class LocalResumeController {
         .orElse(ResponseEntity.notFound().build());
   }
 
+  @GetMapping("/trash")
+  public ResponseEntity<List<ResumeView>> trash(
+      @AuthenticationPrincipal Jwt principal, HttpServletRequest request) {
+    UUID userId = resolveUserId(principal, request);
+    if (userId == null) return ResponseEntity.status(401).build();
+    return ResponseEntity.ok(service.listTrash(userId));
+  }
+
+  @PostMapping("/{id}/restore")
+  public ResponseEntity<Void> restore(
+      @PathVariable UUID id, @AuthenticationPrincipal Jwt principal, HttpServletRequest request) {
+    UUID userId = resolveUserId(principal, request);
+    if (userId == null) return ResponseEntity.status(401).build();
+    return service.restore(id, userId)
+        ? ResponseEntity.noContent().build()
+        : ResponseEntity.notFound().build();
+  }
+
+  @DeleteMapping("/{id}/permanent")
+  public ResponseEntity<Void> permanentDelete(
+      @PathVariable UUID id, @AuthenticationPrincipal Jwt principal, HttpServletRequest request) {
+    UUID userId = resolveUserId(principal, request);
+    if (userId == null) return ResponseEntity.status(401).build();
+    return service.hardDelete(id, userId)
+        ? ResponseEntity.noContent().build()
+        : ResponseEntity.notFound().build();
+  }
+
   @PostMapping
   public ResponseEntity<ResumeView> create(
       @Valid @RequestBody ResumeRequest req,

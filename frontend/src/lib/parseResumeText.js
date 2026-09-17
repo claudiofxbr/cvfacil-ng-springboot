@@ -3,13 +3,16 @@
  *
  * PIPELINE (fallback client-side — usado quando o backend de IA retorna 501):
  *   TXT  → FileReader.readAsText  (sempre funciona)
- *   PDF  → readAsBinaryString + parser BT/ET + validação de encoding
+ *   PDF  → file.arrayBuffer() + pdfjs-dist (extração real de texto, inclusive
+ *          PDFs com streams FlateDecode — cobre a esmagadora maioria dos PDFs
+ *          reais, gerados por Word/LibreOffice/impressora virtual)
  *   DOCX → readAsBinaryString + regex <w:t> + validação de encoding
  *
- * IMPORTANTE: PDFs comprimidos (FlateDecode) e DOCX em geral são ZIP/deflate;
- * sem uma biblioteca nativa (pdfjs-dist / mammoth) a extração pode falhar.
- * Nesses casos a função retorna '' para que o usuário veja a área de texto
- * "cole manualmente" em vez de campos preenchidos com caracteres corrompidos.
+ * IMPORTANTE: DOCX em geral é ZIP/deflate; sem uma biblioteca nativa (mammoth)
+ * a extração por regex pode falhar para arquivos maiores/comprimidos.
+ * PDFs escaneados (imagem, sem camada de texto) também retornam '' — pdfjs-dist
+ * não faz OCR client-side. Nesses casos a função retorna '' para que o usuário
+ * veja a área de texto "cole manualmente" em vez de campos vazios/corrompidos.
  *
  * O pipeline completo (com IA) é gerenciado pelo backend (PDFBox + POI + LLM).
  */
@@ -42,20 +45,13 @@ function readAsText(file) {
 
 // ── PDF ────────────────────────────────────────────────────────────────────────
 
-function extractFromPdf(file) {
-  return new Promise((resolve) => {
-    const r = new FileReader();
-    r.onload = (e) => {
-      try {
-        const text = parsePdfBinary(e.target.result);
-        resolve(text);
-      } catch {
-        resolve('');
-      }
-    };
-    r.onerror = () => resolve('');
-    r.readAsBinaryString(file);
-  });
+async function extractFromPdf(file) {
+  try {
+    const buffer = await file.arrayBuffer();
+    return await parsePdfBinary(buffer);
+  } catch {
+    return '';
+  }
 }
 
 /**
@@ -88,35 +84,41 @@ function isLikelyGarbled(text) {
   return (safe / text.length) < 0.82;
 }
 
-function parsePdfBinary(binary) {
-  const chunks = [];
+/**
+ * Extrai o texto de um PDF (ArrayBuffer) usando pdfjs-dist.
+ *
+ * Cobre PDFs com streams comprimidos (FlateDecode) — a maioria dos PDFs reais.
+ * PDFs escaneados (só imagem, sem camada de texto) não têm texto para extrair
+ * e a função retorna '' silenciosamente; o chamador (dashboard/page.jsx) é
+ * responsável por avisar o usuário e oferecer colar o texto manualmente.
+ */
+async function parsePdfBinary(buffer) {
+  try {
+    const pdfjsLib = await import('pdfjs-dist/legacy/build/pdf.mjs');
+    // Worker servido como asset estático pelo próprio bundle do Next.js —
+    // evita depender de CDN externo (CSP `worker-src`/`script-src 'self'`).
+    pdfjsLib.GlobalWorkerOptions.workerSrc = new URL(
+      'pdfjs-dist/legacy/build/pdf.worker.min.mjs',
+      import.meta.url
+    ).toString();
 
-  // Blocos BT...ET contêm os operadores de texto do PDF
-  // Funciona apenas em PDFs sem FlateDecode (streams não comprimidos)
-  const btEt = /BT[\s\S]*?ET/g;
-  let m;
-  while ((m = btEt.exec(binary)) !== null) {
-    // Texto entre parênteses: (Olá Mundo)
-    const paren = /\(([^)\\]*(?:\\.[^)\\]*)*)\)/g;
-    let p;
-    while ((p = paren.exec(m[0])) !== null) {
-      const t = p[1]
-        .replace(/\\n/g, '\n')
-        .replace(/\\r/g, '')
-        .replace(/\\\(/g, '(')
-        .replace(/\\\)/g, ')')
-        .replace(/\\\\/g, '\\')
-        .replace(/\\[0-7]{1,3}/g, ' ');
-      if (t.trim()) chunks.push(t);
+    const loadingTask = pdfjsLib.getDocument({ data: buffer });
+    const pdf = await loadingTask.promise;
+
+    const pageTexts = [];
+    for (let i = 1; i <= pdf.numPages; i++) {
+      const page = await pdf.getPage(i);
+      const content = await page.getTextContent();
+      const pageText = content.items.map((item) => item.str || '').join(' ');
+      if (pageText.trim()) pageTexts.push(pageText.trim());
     }
+
+    return pageTexts.join('\n').trim();
+  } catch (err) {
+    // PDF corrompido, protegido por senha, ou erro de carregamento do worker.
+    console.warn('[parseResumeText] Falha ao extrair texto do PDF:', err?.message || err);
+    return '';
   }
-
-  const extracted = chunks.join('\n').trim();
-
-  // Valida encoding: se parece lixo binário, retorna '' para o usuário colar manualmente
-  if (isLikelyGarbled(extracted)) return '';
-
-  return extracted;
 }
 
 // ── DOCX ───────────────────────────────────────────────────────────────────────

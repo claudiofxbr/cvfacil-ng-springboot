@@ -1,6 +1,7 @@
 package ng.cvfacil.service;
 
 import java.nio.charset.StandardCharsets;
+import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -36,11 +37,20 @@ public class ResumeService {
   }
 
   public List<ResumeView> list(UUID userId) {
-    return resumes.findByUserIdOrderByUpdatedAtDesc(userId).stream().map(this::toView).toList();
+    return resumes.findByUserIdAndDeletedAtIsNullOrderByUpdatedAtDesc(userId).stream()
+        .map(this::toView)
+        .toList();
   }
 
   public Optional<ResumeView> get(UUID id, UUID userId) {
-    return resumes.findById(id).filter(r -> r.getUserId().equals(userId)).map(this::toView);
+    return resumes.findByIdAndUserIdAndDeletedAtIsNull(id, userId).map(this::toView);
+  }
+
+  /** Lista os currículos na lixeira (soft-deletados) do usuário. */
+  public List<ResumeView> listTrash(UUID userId) {
+    return resumes.findByUserIdAndDeletedAtIsNotNullOrderByDeletedAtDesc(userId).stream()
+        .map(this::toView)
+        .toList();
   }
 
   /**
@@ -59,8 +69,7 @@ public class ResumeService {
 
   public Optional<ResumeView> update(UUID id, UUID userId, ResumeRequest req) {
     return resumes
-        .findById(id)
-        .filter(r -> r.getUserId().equals(userId))
+        .findByIdAndUserIdAndDeletedAtIsNull(id, userId)
         .map(
             r -> {
               applyRequest(r, req);
@@ -70,8 +79,33 @@ public class ResumeService {
             });
   }
 
+  /** Move o currículo para a lixeira (soft-delete). Retorna false se não achar um ativo. */
+  @Transactional
   public boolean delete(UUID id, UUID userId) {
-    Resume found = resumes.findById(id).filter(r -> r.getUserId().equals(userId)).orElse(null);
+    Resume found = resumes.findByIdAndUserIdAndDeletedAtIsNull(id, userId).orElse(null);
+    if (found == null) return false;
+    found.setDeletedAt(Instant.now());
+    resumes.save(found);
+    return true;
+  }
+
+  /** Restaura um currículo da lixeira. Retorna false se não achar um deletado. */
+  @Transactional
+  public boolean restore(UUID id, UUID userId) {
+    Resume found = resumes.findByIdAndUserIdAndDeletedAtIsNotNull(id, userId).orElse(null);
+    if (found == null) return false;
+    found.setDeletedAt(null);
+    resumes.save(found);
+    return true;
+  }
+
+  /**
+   * Exclui permanentemente um currículo já na lixeira. Retorna false se não achar um deletado
+   * (proteção contra excluir permanentemente por engano um currículo ativo).
+   */
+  @Transactional
+  public boolean hardDelete(UUID id, UUID userId) {
+    Resume found = resumes.findByIdAndUserIdAndDeletedAtIsNotNull(id, userId).orElse(null);
     if (found == null) return false;
     resumes.delete(found);
     return true;

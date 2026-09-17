@@ -211,8 +211,16 @@ class ResumeControllerIntegrationTest {
     mvc.perform(delete("/api/resumes/" + id).header("Authorization", "Bearer " + stubToken))
         .andExpect(status().isNoContent());
 
-    // Confirma que foi removido
-    assertThat(resumes.findById(id)).isEmpty();
+    // Soft-delete: o registro continua existindo, mas marcado como deletado
+    assertThat(resumes.findById(id)).isPresent();
+    assertThat(resumes.findById(id).get().getDeletedAt()).isNotNull();
+
+    // Não é mais visível via get nem via list
+    mvc.perform(get("/api/resumes/" + id).header("Authorization", "Bearer " + stubToken))
+        .andExpect(status().isNotFound());
+    mvc.perform(get("/api/resumes").header("Authorization", "Bearer " + stubToken))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.length()").value(0));
   }
 
   @Test
@@ -221,6 +229,105 @@ class ResumeControllerIntegrationTest {
             delete("/api/resumes/" + UUID.randomUUID())
                 .header("Authorization", "Bearer " + stubToken))
         .andExpect(status().isNotFound());
+  }
+
+  // ── Lixeira: GET /api/resumes/trash, POST /{id}/restore, DELETE /{id}/permanent ────
+
+  @Test
+  void deleteResume_movesToTrash_hiddenFromListButRestorable() throws Exception {
+    UUID id = createResumeViaApi(stubToken, "classic", "{\"fullName\":\"Lixeira\"}");
+
+    mvc.perform(delete("/api/resumes/" + id).header("Authorization", "Bearer " + stubToken))
+        .andExpect(status().isNoContent());
+
+    mvc.perform(get("/api/resumes").header("Authorization", "Bearer " + stubToken))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.length()").value(0));
+
+    mvc.perform(get("/api/resumes/trash").header("Authorization", "Bearer " + stubToken))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.length()").value(1))
+        .andExpect(jsonPath("$[0].id").value(id.toString()));
+
+    mvc.perform(
+            post("/api/resumes/" + id + "/restore").header("Authorization", "Bearer " + stubToken))
+        .andExpect(status().isNoContent());
+
+    mvc.perform(get("/api/resumes").header("Authorization", "Bearer " + stubToken))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.length()").value(1))
+        .andExpect(jsonPath("$[0].id").value(id.toString()));
+
+    mvc.perform(get("/api/resumes/trash").header("Authorization", "Bearer " + stubToken))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.length()").value(0));
+  }
+
+  @Test
+  void permanentDelete_onTrashedResume_removesForever() throws Exception {
+    UUID id = createResumeViaApi(stubToken, "classic", "{\"fullName\":\"Apagar de vez\"}");
+
+    mvc.perform(delete("/api/resumes/" + id).header("Authorization", "Bearer " + stubToken))
+        .andExpect(status().isNoContent());
+
+    mvc.perform(
+            delete("/api/resumes/" + id + "/permanent")
+                .header("Authorization", "Bearer " + stubToken))
+        .andExpect(status().isNoContent());
+
+    assertThat(resumes.findById(id)).isEmpty();
+
+    mvc.perform(get("/api/resumes").header("Authorization", "Bearer " + stubToken))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.length()").value(0));
+    mvc.perform(get("/api/resumes/trash").header("Authorization", "Bearer " + stubToken))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.length()").value(0));
+  }
+
+  @Test
+  void permanentDelete_onActiveResume_returns404() throws Exception {
+    UUID id = createResumeViaApi(stubToken, "classic", "{\"fullName\":\"Ativo\"}");
+
+    mvc.perform(
+            delete("/api/resumes/" + id + "/permanent")
+                .header("Authorization", "Bearer " + stubToken))
+        .andExpect(status().isNotFound());
+
+    assertThat(resumes.findById(id)).isPresent();
+  }
+
+  @Test
+  void restore_onNonTrashedResume_returns404() throws Exception {
+    UUID id = createResumeViaApi(stubToken, "classic", "{\"fullName\":\"Ativo\"}");
+
+    mvc.perform(
+            post("/api/resumes/" + id + "/restore").header("Authorization", "Bearer " + stubToken))
+        .andExpect(status().isNotFound());
+  }
+
+  @Test
+  void trash_doesNotReturnOtherUsersDeletedResumes() throws Exception {
+    User other = new User();
+    other.setEmail("other-trash@cvfacil.ng");
+    other.setPasswordHash(encoder.encode("Senha@Forte123"));
+    other.setDisplayName("OtherTrash");
+    other.setCredits(10);
+    users.save(other);
+    String otherToken = jwtService.issueAccessToken(other);
+    try {
+      UUID otherId = createResumeViaApi(otherToken, "classic", "{\"fullName\":\"Outro\"}");
+      mvc.perform(delete("/api/resumes/" + otherId).header("Authorization", "Bearer " + otherToken))
+          .andExpect(status().isNoContent());
+
+      // O usuário principal não deve ver o currículo deletado do outro na sua lixeira
+      mvc.perform(get("/api/resumes/trash").header("Authorization", "Bearer " + stubToken))
+          .andExpect(status().isOk())
+          .andExpect(jsonPath("$.length()").value(0));
+    } finally {
+      resumes.deleteAll(resumes.findByUserIdOrderByUpdatedAtDesc(other.getId()));
+      users.delete(other);
+    }
   }
 
   // ── helpers ───────────────────────────────────────────────────────────────
