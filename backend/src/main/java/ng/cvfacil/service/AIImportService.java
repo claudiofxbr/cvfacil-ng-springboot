@@ -65,6 +65,14 @@ public class AIImportService {
    */
   private static final int MIN_TEXT_LENGTH_FOR_SKIP_OCR = 80;
 
+  /**
+   * Limite de tokens de saida do LLM. Elevado de 4000 para 8000 — curriculos extensos (muitas
+   * experiencias/bullets) podiam gerar JSON truncado no limite anterior, quebrando o parse em
+   * normalizeResumeJson com um erro opaco sem relacao aparente com a causa real (limite de tokens,
+   * nao um bug de parsing).
+   */
+  private static final int MAX_OUTPUT_TOKENS = 8000;
+
   // ── System prompt: instrui o LLM a extrair dados no schema do CVFacil.NG ──
   private static final String SYSTEM_PROMPT =
       "Voce e um parser especializado em curriculos. Analise o texto fornecido e extraia "
@@ -149,11 +157,20 @@ public class AIImportService {
 
   private final ObjectMapper mapper = new ObjectMapper();
 
-  private final HttpClient httpClient =
+  private HttpClient httpClient =
       HttpClient.newBuilder()
           .connectTimeout(Duration.ofSeconds(30))
           .version(HttpClient.Version.HTTP_2)
           .build();
+
+  /**
+   * Substitui o HttpClient em testes, para simular respostas do provedor (erro HTTP, corpo
+   * malformado, bloqueio de safety) sem rede real. Nao usado em producao — o Spring nunca chama
+   * isto, o campo mantem o HttpClient real construido acima.
+   */
+  void setHttpClientForTesting(HttpClient httpClient) {
+    this.httpClient = httpClient;
+  }
 
   // ── API publica ─────────────────────────────────────────────────────────────
 
@@ -373,7 +390,7 @@ public class AIImportService {
     ObjectNode body = mapper.createObjectNode();
     body.put("model", model.isBlank() ? "gpt-4o-mini" : model);
     body.put("temperature", 0.1);
-    body.put("max_tokens", 4000);
+    body.put("max_tokens", MAX_OUTPUT_TOKENS);
     body.set("messages", messages);
     // response_format json_object garante que o modelo retorne JSON valido
     body.set("response_format", mapper.createObjectNode().put("type", "json_object"));
@@ -392,10 +409,11 @@ public class AIImportService {
 
     if (response.statusCode() != 200) {
       log.error("[AI Import] OpenAI retornou HTTP {}: {}", response.statusCode(), response.body());
-      throw new RuntimeException(
+      throw new AIProviderException(
           "Erro na API OpenAI (HTTP "
               + response.statusCode()
-              + "). Verifique a API key e o modelo configurado.");
+              + "). Verifique a API key e o modelo configurado.",
+          502);
     }
 
     return mapper.readTree(response.body()).at("/choices/0/message/content").asText();
@@ -407,7 +425,7 @@ public class AIImportService {
 
     ObjectNode body = mapper.createObjectNode();
     body.put("model", model.isBlank() ? "claude-3-5-haiku-20241022" : model);
-    body.put("max_tokens", 4000);
+    body.put("max_tokens", MAX_OUTPUT_TOKENS);
     body.put("system", SYSTEM_PROMPT);
     body.set("messages", messages);
 
@@ -427,10 +445,11 @@ public class AIImportService {
     if (response.statusCode() != 200) {
       log.error(
           "[AI Import] Anthropic retornou HTTP {}: {}", response.statusCode(), response.body());
-      throw new RuntimeException(
+      throw new AIProviderException(
           "Erro na API Anthropic (HTTP "
               + response.statusCode()
-              + "). Verifique a API key e o modelo configurado.");
+              + "). Verifique a API key e o modelo configurado.",
+          502);
     }
 
     return mapper.readTree(response.body()).at("/content/0/text").asText();
@@ -458,7 +477,7 @@ public class AIImportService {
 
     ObjectNode generationConfig = mapper.createObjectNode();
     generationConfig.put("temperature", 0.1);
-    generationConfig.put("maxOutputTokens", 4000);
+    generationConfig.put("maxOutputTokens", MAX_OUTPUT_TOKENS);
     generationConfig.put("responseMimeType", "application/json");
 
     ObjectNode body = mapper.createObjectNode();
@@ -488,12 +507,13 @@ public class AIImportService {
       boolean transient_ = status == 503 || status == 429;
       if (!transient_ || attempt == maxAttempts) {
         log.error("[AI Import] Gemini retornou HTTP {}: {}", status, response.body());
-        throw new RuntimeException(
+        throw new AIProviderException(
             transient_
                 ? "O modelo Gemini esta temporariamente sobrecarregado. Tente novamente em instantes."
                 : "Erro na API Gemini (HTTP "
                     + status
-                    + "). Verifique a API key e o modelo configurado.");
+                    + "). Verifique a API key e o modelo configurado.",
+            transient_ ? 503 : 502);
       }
       log.warn(
           "[AI Import] Gemini retornou HTTP {} (tentativa {}/{}) — retentando em {}ms",
@@ -505,11 +525,60 @@ public class AIImportService {
         Thread.sleep(1000L << (attempt - 1)); // 1s, 2s
       } catch (InterruptedException e) {
         Thread.currentThread().interrupt();
-        throw new RuntimeException("Importacao interrompida.", e);
+        throw new AIProviderException("Importacao interrompida.", 503, e);
       }
     }
 
-    return mapper.readTree(response.body()).at("/candidates/0/content/parts/0/text").asText();
+    return extractGeminiText(response.body());
+  }
+
+  /**
+   * Extrai o texto de "/candidates/0/content/parts/0/text" da resposta do Gemini, tratando
+   * explicitamente o caso em que o conteudo foi bloqueado pelo filtro de seguranca ou a resposta
+   * foi truncada por limite de tokens — ambos retornam HTTP 200 com "candidates" ausente/vazio, o
+   * que sem esta checagem vira uma string vazia silenciosa e quebra mais adiante no parse do JSON
+   * (normalizeResumeJson), como um erro 500 opaco sem relacao aparente com a causa real. Curriculos
+   * reais contem CPF/telefone/endereco — exatamente o tipo de PII que o filtro de seguranca do
+   * Gemini tende a sinalizar.
+   */
+  private String extractGeminiText(String responseBody) throws Exception {
+    var root = mapper.readTree(responseBody);
+    var candidates = root.at("/candidates");
+    if (!candidates.isArray() || candidates.isEmpty()) {
+      String blockReason = root.at("/promptFeedback/blockReason").asText("");
+      log.error(
+          "[AI Import] Gemini nao retornou candidates. blockReason='{}'. Corpo: {}",
+          blockReason,
+          responseBody);
+      throw new AIProviderException(
+          blockReason.isBlank()
+              ? "O provedor de IA nao retornou uma resposta valida. Tente novamente."
+              : "O conteudo do curriculo foi bloqueado pelo filtro de seguranca do provedor de IA"
+                  + " (motivo: "
+                  + blockReason
+                  + "). Tente colar o texto manualmente.",
+          502);
+    }
+
+    var candidate = candidates.get(0);
+    String finishReason = candidate.at("/finishReason").asText("");
+    String text = candidate.at("/content/parts/0/text").asText("");
+    if (text.isBlank()) {
+      log.error(
+          "[AI Import] Gemini retornou candidate sem texto. finishReason='{}'. Corpo: {}",
+          finishReason,
+          responseBody);
+      throw new AIProviderException(
+          "SAFETY".equals(finishReason)
+              ? "O conteudo do curriculo foi bloqueado pelo filtro de seguranca do provedor de IA."
+                  + " Tente colar o texto manualmente."
+              : "MAX_TOKENS".equals(finishReason)
+                  ? "A resposta da IA foi truncada (curriculo muito extenso). Tente um resumo"
+                      + " mais curto ou cole o texto manualmente."
+                  : "O provedor de IA nao retornou uma resposta valida. Tente novamente.",
+          502);
+    }
+    return text;
   }
 
   // ── Normalizacao do JSON ────────────────────────────────────────────────────
