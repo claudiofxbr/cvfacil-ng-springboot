@@ -498,7 +498,14 @@ public class AIImportService {
     // Gemini free-tier retorna 503 "UNAVAILABLE" (modelo sobrecarregado) e 429 "RESOURCE_EXHAUSTED"
     // com frequencia — a propria Google recomenda retry. Sem isso, qualquer pico de demanda no lado
     // deles derruba a importacao mesmo com chave/modelo corretos.
-    int maxAttempts = 3;
+    //
+    // 5 tentativas (4 esperas) com backoff exponencial 1s/2s/4s/8s, respeitando o header
+    // Retry-After quando o Gemini o envia (mais confiavel que adivinhar o tempo de espera) — soma
+    // maxima de ~23s, dentro do timeout de 90s da requisicao e do orcamento razoavel de um upload
+    // sincrono. Elevado de 3 tentativas/~3s (insuficiente contra picos reais de sobrecarga,
+    // confirmado em producao) para isto.
+    int maxAttempts = 5;
+    long maxBackoffMs = 8_000L;
     HttpResponse<String> response = null;
     for (int attempt = 1; attempt <= maxAttempts; attempt++) {
       response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
@@ -515,14 +522,21 @@ public class AIImportService {
                     + "). Verifique a API key e o modelo configurado.",
             transient_ ? 503 : 502);
       }
+      long backoffMs =
+          response
+              .headers()
+              .firstValue("Retry-After")
+              .map(AIImportService::parseRetryAfterSeconds)
+              .map(seconds -> Math.min(seconds * 1000L, maxBackoffMs))
+              .orElse(Math.min(1000L << (attempt - 1), maxBackoffMs));
       log.warn(
           "[AI Import] Gemini retornou HTTP {} (tentativa {}/{}) — retentando em {}ms",
           status,
           attempt,
           maxAttempts,
-          1000L << (attempt - 1));
+          backoffMs);
       try {
-        Thread.sleep(1000L << (attempt - 1)); // 1s, 2s
+        Thread.sleep(backoffMs);
       } catch (InterruptedException e) {
         Thread.currentThread().interrupt();
         throw new AIProviderException("Importacao interrompida.", 503, e);
@@ -530,6 +544,19 @@ public class AIImportService {
     }
 
     return extractGeminiText(response.body());
+  }
+
+  /**
+   * Interpreta o header Retry-After como segundos inteiros (formato usado pelo Gemini). Retorna
+   * null quando ausente ou em formato nao numerico (ex.: HTTP-date, que este provedor nao usa) —
+   * nesse caso o chamador cai no backoff exponencial padrao.
+   */
+  private static Long parseRetryAfterSeconds(String headerValue) {
+    try {
+      return Long.parseLong(headerValue.trim());
+    } catch (NumberFormatException e) {
+      return null;
+    }
   }
 
   /**
