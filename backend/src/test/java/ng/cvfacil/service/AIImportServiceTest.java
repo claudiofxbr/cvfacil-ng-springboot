@@ -17,17 +17,17 @@ import org.apache.poi.xwpf.usermodel.XWPFRun;
 import org.junit.jupiter.api.Test;
 
 /**
- * Testes unitários para AIImportService — foco na lógica determinística
- * (normalizeResumeJson) e na extração de texto de PDF/DOCX, que é o que a
- * auditoria apontou como maior risco por não ter nenhuma cobertura.
+ * Testes unitários para AIImportService — foco na lógica determinística (normalizeResumeJson) e na
+ * extração de texto de PDF/DOCX, que é o que a auditoria apontou como maior risco por não ter
+ * nenhuma cobertura.
  *
- * <p>Chamadas reais a LLM externo (callOpenAI/callAnthropic/callGemini) não são exercitadas
- * aqui: são métodos privados que fazem HTTP real via um HttpClient construído internamente
- * (sem ponto de injeção), e refatorar a classe de produção só para viabilizar mock está fora
- * do escopo desta tarefa. O caminho de OCR (extractWithOcr) também não é exercitado: exige
- * Tesseract nativo instalado (tessdata) e não há fixture/config de teste para isso no projeto;
- * o teste de extractFromPdf usa texto suficientemente longo (> 80 chars) para permanecer no
- * caminho "sem OCR" (PDFBox puro).
+ * <p>Chamadas reais a LLM externo (callOpenAI/callAnthropic/callGemini) não são exercitadas aqui:
+ * são métodos privados que fazem HTTP real via um HttpClient construído internamente (sem ponto de
+ * injeção), e refatorar a classe de produção só para viabilizar mock está fora do escopo desta
+ * tarefa. O caminho de OCR (extractWithOcr) também não é exercitado: exige Tesseract nativo
+ * instalado (tessdata) e não há fixture/config de teste para isso no projeto; o teste de
+ * extractFromPdf usa texto suficientemente longo (> 80 chars) para permanecer no caminho "sem OCR"
+ * (PDFBox puro).
  */
 class AIImportServiceTest {
 
@@ -114,7 +114,8 @@ class AIImportServiceTest {
   void normalizeResumeJson_bulletsVaziosOuEmBranco_saoDescartadosAntesDoPreenchimento()
       throws Exception {
     String input =
-        "{\"experience\":[{\"bullets\":[\"\",\"   \",\"Valido\"]}]}"; // strings vazias/blank filtradas
+        "{\"experience\":[{\"bullets\":[\"\",\"   \",\"Valido\"]}]}"; // strings vazias/blank
+    // filtradas
 
     String result = service.normalizeResumeJson(input);
     JsonNode bullets = mapper.readTree(result).get("experience").get(0).get("bullets");
@@ -215,7 +216,9 @@ class AIImportServiceTest {
   void extractText_txt_retornaConteudoDecodificadoUtf8() throws Exception {
     String texto = "Curriculo em texto simples com acentuacao: ção, ã, é.";
 
-    String extraido = service.extractText(texto.getBytes(java.nio.charset.StandardCharsets.UTF_8), "curriculo.txt");
+    String extraido =
+        service.extractText(
+            texto.getBytes(java.nio.charset.StandardCharsets.UTF_8), "curriculo.txt");
 
     assertThat(extraido).isEqualTo(texto);
   }
