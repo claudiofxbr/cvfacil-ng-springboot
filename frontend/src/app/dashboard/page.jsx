@@ -478,8 +478,21 @@ function ImportTab({ router }) {
   // templates fixos, não mais um placeholder.
   const [layoutId,    setLayoutId]    = useState('corporate-blue-split');
   const [usedAI,      setUsedAI]      = useState(false);
-  // aiFailReason: null | 'no-key' | 'offline' | 'auth' | 'server' | 'unknown'
+  // aiFailReason: null | 'no-key' | 'offline' | 'auth' | 'provider' | 'server' | 'unknown'
   const [aiFailReason, setAiFailReason] = useState(null);
+  // Mensagem especifica extraida do corpo da resposta de erro (ex: bloqueio de seguranca do
+  // provedor, rate limit) — quando ausente, a UI cai no texto generico do bucket.
+  const [aiFailDetail, setAiFailDetail] = useState(null);
+
+  // Extrai {"error": "..."} do corpo de uma resposta de erro da API, quando presente.
+  function extractApiErrorMessage(err) {
+    try {
+      const parsed = JSON.parse(err?.body ?? '');
+      return typeof parsed?.error === 'string' ? parsed.error : null;
+    } catch {
+      return null;
+    }
+  }
   // LGPD Art. 9 / GDPR Art. 44-49: o currículo (dado pessoal) sai para um provedor de
   // IA externo — precisa de consentimento explícito e específico a cada envio, não
   // um aceite genérico dado uma vez no cadastro.
@@ -514,6 +527,7 @@ function ImportTab({ router }) {
   async function tryAIImport(file) {
     setStatus('ai-processing');
     setAiFailReason(null);
+    setAiFailDetail(null);
     try {
       const formData = new FormData();
       formData.append('file', file);
@@ -543,6 +557,14 @@ function ImportTab({ router }) {
         // Problema de autenticação / CSRF
         console.warn('[Import] Erro de autenticação ao chamar IA:', e.status, e.message);
         setAiFailReason('auth');
+      } else if (e.status === 502 || e.status === 503) {
+        // Falha do provedor de IA externo (chave invalida, rate limit, bloqueio de seguranca,
+        // resposta truncada) — o backend manda uma mensagem especifica e acionavel, mostrar em
+        // vez do texto generico de "erro interno".
+        const detail = extractApiErrorMessage(e);
+        console.warn('[Import] Falha no provedor de IA:', e.status, detail ?? e.message);
+        setAiFailReason('provider');
+        setAiFailDetail(detail);
       } else if (e.status >= 500) {
         // Erro interno do servidor (ex: OCR falhou, JSON inválido do LLM)
         console.warn('[Import] Erro interno do servidor ao processar IA:', e.status, e.message);
@@ -690,6 +712,10 @@ function ImportTab({ router }) {
           'auth': {
             title: 'Importação básica — erro de autenticação.',
             detail: 'Faça login novamente ou recarregue a página.',
+          },
+          'provider': {
+            title: 'Importação básica — provedor de IA indisponível.',
+            detail: aiFailDetail || 'Tente novamente em instantes ou cole o texto manualmente.',
           },
           'server': {
             title: 'Importação básica — erro interno no servidor.',

@@ -3,6 +3,7 @@ package ng.cvfacil.web;
 import java.util.Set;
 import java.util.UUID;
 import ng.cvfacil.service.AIImportService;
+import ng.cvfacil.service.AIProviderException;
 import ng.cvfacil.service.AuditService;
 import org.slf4j.Logger;
 import org.springframework.http.ResponseEntity;
@@ -89,6 +90,12 @@ final class AIImportRequestSupport {
     } catch (IllegalArgumentException e) {
       log.warn("{} Arquivo inválido: {}", logPrefix, e.getMessage());
       return ResponseEntity.badRequest()
+          .body("{\"error\":\"" + e.getMessage().replace("\"", "'") + "\"}");
+    } catch (AIProviderException e) {
+      // Falha do provedor de IA externo (chave invalida, rate limit, bloqueio de seguranca,
+      // truncamento) — mensagem especifica e acionavel, nao pode ser descartada como 500 opaco.
+      log.error("{} Falha no provedor de IA ao processar '{}': {}", logPrefix, fn, e.getMessage());
+      return ResponseEntity.status(e.getHttpStatus())
           .body("{\"error\":\"" + e.getMessage().replace("\"", "'") + "\"}");
     } catch (Exception e) {
       log.error("{} Erro ao processar '{}': {}", logPrefix, fn, e.getMessage(), e);

@@ -5,7 +5,11 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.sun.net.httpserver.HttpServer;
 import java.io.ByteArrayOutputStream;
+import java.net.InetSocketAddress;
+import java.net.http.HttpClient;
+import java.nio.charset.StandardCharsets;
 import org.apache.pdfbox.pdmodel.PDDocument;
 import org.apache.pdfbox.pdmodel.PDPage;
 import org.apache.pdfbox.pdmodel.PDPageContentStream;
@@ -15,19 +19,19 @@ import org.apache.poi.xwpf.usermodel.XWPFDocument;
 import org.apache.poi.xwpf.usermodel.XWPFParagraph;
 import org.apache.poi.xwpf.usermodel.XWPFRun;
 import org.junit.jupiter.api.Test;
+import org.springframework.test.util.ReflectionTestUtils;
 
 /**
- * Testes unitários para AIImportService — foco na lógica determinística (normalizeResumeJson) e na
- * extração de texto de PDF/DOCX, que é o que a auditoria apontou como maior risco por não ter
- * nenhuma cobertura.
+ * Testes unitários para AIImportService — cobre a lógica determinística (normalizeResumeJson), a
+ * extração de texto de PDF/DOCX, e os caminhos de erro das chamadas ao provedor de IA
+ * (callOpenAI/callAnthropic/callGemini), usando um HttpServer local (setHttpClientForTesting) em
+ * vez de rede real — foi exatamente a ausência dessa cobertura que deixou passar em produção um bug
+ * de resposta do Gemini bloqueada por safety/truncada virando 500 opaco em vez de mensagem
+ * acionável (ver AIProviderException).
  *
- * <p>Chamadas reais a LLM externo (callOpenAI/callAnthropic/callGemini) não são exercitadas aqui:
- * são métodos privados que fazem HTTP real via um HttpClient construído internamente (sem ponto de
- * injeção), e refatorar a classe de produção só para viabilizar mock está fora do escopo desta
- * tarefa. O caminho de OCR (extractWithOcr) também não é exercitado: exige Tesseract nativo
- * instalado (tessdata) e não há fixture/config de teste para isso no projeto; o teste de
- * extractFromPdf usa texto suficientemente longo (> 80 chars) para permanecer no caminho "sem OCR"
- * (PDFBox puro).
+ * <p>O caminho de OCR (extractWithOcr) não é exercitado: exige Tesseract nativo instalado
+ * (tessdata) e não há fixture/config de teste para isso no projeto; o teste de extractFromPdf usa
+ * texto suficientemente longo (> 80 chars) para permanecer no caminho "sem OCR" (PDFBox puro).
  */
 class AIImportServiceTest {
 
@@ -221,6 +225,146 @@ class AIImportServiceTest {
             texto.getBytes(java.nio.charset.StandardCharsets.UTF_8), "curriculo.txt");
 
     assertThat(extraido).isEqualTo(texto);
+  }
+
+  // ── parseWithAI / callGemini (provedor padrao em producao) ──────────────
+
+  @Test
+  void callGemini_httpErro_lancaAIProviderExceptionComMensagemAcionavel() throws Exception {
+    withStubServer(
+        (status, body) -> {
+          configurarServicoParaTeste("gemini", status, body);
+          assertThatThrownBy(() -> service.parseWithAI("texto do curriculo"))
+              .isInstanceOf(AIProviderException.class)
+              .hasMessageContaining("Verifique a API key")
+              .satisfies(e -> assertThat(((AIProviderException) e).getHttpStatus()).isEqualTo(502));
+        },
+        401,
+        "{\"error\":\"invalid api key\"}");
+  }
+
+  @Test
+  void callGemini_semCandidatesComBlockReason_indicaBloqueioDeSeguranca() throws Exception {
+    withStubServer(
+        (status, body) -> {
+          configurarServicoParaTeste("gemini", status, body);
+          assertThatThrownBy(() -> service.parseWithAI("curriculo com CPF e telefone"))
+              .isInstanceOf(AIProviderException.class)
+              .hasMessageContaining("bloqueado pelo filtro de seguranca")
+              .hasMessageContaining("SAFETY");
+        },
+        200,
+        "{\"promptFeedback\":{\"blockReason\":\"SAFETY\"}}");
+  }
+
+  @Test
+  void callGemini_finishReasonSafetySemTexto_indicaBloqueioDeSeguranca() throws Exception {
+    withStubServer(
+        (status, body) -> {
+          configurarServicoParaTeste("gemini", status, body);
+          assertThatThrownBy(() -> service.parseWithAI("curriculo"))
+              .isInstanceOf(AIProviderException.class)
+              .hasMessageContaining("bloqueado pelo filtro de seguranca");
+        },
+        200,
+        "{\"candidates\":[{\"finishReason\":\"SAFETY\",\"content\":{\"parts\":[]}}]}");
+  }
+
+  @Test
+  void callGemini_finishReasonMaxTokens_indicaResumoTruncado() throws Exception {
+    withStubServer(
+        (status, body) -> {
+          configurarServicoParaTeste("gemini", status, body);
+          assertThatThrownBy(() -> service.parseWithAI("curriculo muito extenso"))
+              .isInstanceOf(AIProviderException.class)
+              .hasMessageContaining("truncada");
+        },
+        200,
+        "{\"candidates\":[{\"finishReason\":\"MAX_TOKENS\",\"content\":{\"parts\":[]}}]}");
+  }
+
+  @Test
+  void callGemini_respostaValida_retornaTextoDoCandidato() throws Exception {
+    withStubServer(
+        (status, body) -> {
+          configurarServicoParaTeste("gemini", status, body);
+          String result = service.parseWithAI("curriculo");
+          assertThat(result).isEqualTo("{\"fullName\":\"Maria\"}");
+        },
+        200,
+        "{\"candidates\":[{\"finishReason\":\"STOP\",\"content\":{\"parts\":"
+            + "[{\"text\":\"{\\\"fullName\\\":\\\"Maria\\\"}\"}]}}]}");
+  }
+
+  // ── parseWithAI / callOpenAI e callAnthropic ─────────────────────────────
+
+  @Test
+  void callOpenAI_httpErro_lancaAIProviderException() throws Exception {
+    withStubServer(
+        (status, body) -> {
+          configurarServicoParaTeste("openai", status, body);
+          assertThatThrownBy(() -> service.parseWithAI("texto"))
+              .isInstanceOf(AIProviderException.class)
+              .hasMessageContaining("API OpenAI")
+              .satisfies(e -> assertThat(((AIProviderException) e).getHttpStatus()).isEqualTo(502));
+        },
+        429,
+        "{\"error\":\"rate limited\"}");
+  }
+
+  @Test
+  void callAnthropic_httpErro_lancaAIProviderException() throws Exception {
+    withStubServer(
+        (status, body) -> {
+          configurarServicoParaTeste("anthropic", status, body);
+          assertThatThrownBy(() -> service.parseWithAI("texto"))
+              .isInstanceOf(AIProviderException.class)
+              .hasMessageContaining("API Anthropic");
+        },
+        500,
+        "{\"error\":\"internal\"}");
+  }
+
+  // ── helpers de infraestrutura de teste (stub HTTP local) ─────────────────
+
+  @FunctionalInterface
+  private interface StubServerTest {
+    void run(int status, String body) throws Exception;
+  }
+
+  /**
+   * Sobe um HttpServer local respondendo sempre com {@code status}/{@code body}, para exercitar
+   * callOpenAI/callAnthropic/callGemini sem rede real. Usa setHttpClientForTesting apenas para
+   * garantir um HttpClient fresco por teste; a URL do servidor local e propagada via o campo
+   * baseUrl (reflection), nao via o HttpClient em si.
+   */
+  private void withStubServer(StubServerTest test, int status, String body) throws Exception {
+    HttpServer httpServer = HttpServer.create(new InetSocketAddress("localhost", 0), 0);
+    httpServer.createContext(
+        "/",
+        exchange -> {
+          byte[] resp = body.getBytes(StandardCharsets.UTF_8);
+          exchange.sendResponseHeaders(status, resp.length);
+          try (var os = exchange.getResponseBody()) {
+            os.write(resp);
+          }
+        });
+    httpServer.start();
+    try {
+      ReflectionTestUtils.setField(
+          service, "httpClient", HttpClient.newBuilder().build(), HttpClient.class);
+      String base = "http://localhost:" + httpServer.getAddress().getPort();
+      ReflectionTestUtils.setField(service, "baseUrl", base);
+      test.run(status, body);
+    } finally {
+      httpServer.stop(0);
+    }
+  }
+
+  private void configurarServicoParaTeste(String provider, int status, String body) {
+    ReflectionTestUtils.setField(service, "provider", provider);
+    ReflectionTestUtils.setField(service, "apiKey", "test-key");
+    ReflectionTestUtils.setField(service, "model", "");
   }
 
   // ── helpers ──────────────────────────────────────────────────────────────
