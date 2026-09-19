@@ -36,7 +36,7 @@ const THEME_SCRIPT = `
 
 export default function RootLayout({ children }) {
   return (
-    <html lang="pt-BR">
+    <html lang="pt-BR" suppressHydrationWarning>
       {/* Script de tema executado antes do CSS/JS do React — elimina flash */}
       <head>
         {/*
