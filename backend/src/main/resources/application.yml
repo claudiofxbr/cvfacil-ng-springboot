@@ -45,8 +45,11 @@ spring:
       client:
         registration:
           google:
-            # Em dev sem credenciais OAuth, os campos caem para vazio e a feature de login Google
-            # fica inativa mas o contexto sobe normalmente.
+            # GOOGLE_OAUTH_CLIENT_ID/SECRET sao obrigatorios (nao-vazios) mesmo em dev local:
+            # o Spring Boot valida a registration 'google' na inicializacao e falha o startup
+            # com "Client id of registration 'google' must not be empty" se ficarem em branco.
+            # Em dev sem OAuth de verdade, defina qualquer valor fake (ex: local-dev-client-id) -
+            # a feature de login Google so falhara em tempo de uso, nao no startup.
             client-id: ${GOOGLE_OAUTH_CLIENT_ID:}
             client-secret: ${GOOGLE_OAUTH_CLIENT_SECRET:}
             scope: openid,email,profile
