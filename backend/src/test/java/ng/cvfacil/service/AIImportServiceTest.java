@@ -297,8 +297,9 @@ class AIImportServiceTest {
   }
 
   @Test
-  void callGemini_503PersistenteComRetryAfterZero_esgota5TentativasELancaMensagemDeSobrecarga()
-      throws Exception {
+  void
+      callGemini_503PersistenteEmTodosOsModelos_esgota3TentativasPorModeloELancaMensagemDeSobrecarga()
+          throws Exception {
     java.util.concurrent.atomic.AtomicInteger requestCount =
         new java.util.concurrent.atomic.AtomicInteger(0);
     withStubServerComHeaders(
@@ -308,13 +309,82 @@ class AIImportServiceTest {
               .isInstanceOf(AIProviderException.class)
               .hasMessageContaining("temporariamente sobrecarregado")
               .satisfies(e -> assertThat(((AIProviderException) e).getHttpStatus()).isEqualTo(503));
-          // 5 tentativas (era 3) — confirma que o limite foi elevado, nao apenas mantido
-          assertThat(requestCount.get()).isEqualTo(5);
+          // 3 modelos candidatos (gemini-flash-latest, gemini-2.5-flash, gemini-2.0-flash) x 3
+          // tentativas cada = 9 — confirma que TODOS os modelos foram tentados antes de desistir,
+          // nao so o primeiro.
+          assertThat(requestCount.get()).isEqualTo(9);
         },
         503,
         "{\"error\":\"UNAVAILABLE\"}",
         java.util.Map.of("Retry-After", "0"),
         requestCount);
+  }
+
+  @Test
+  void callGemini_primeiroModelo404_tentaProximoModeloDaListaImediatamente() throws Exception {
+    // "gemini-flash-latest" (1o candidato) nao encontrado para esta chave -> deve pular direto
+    // para "gemini-2.5-flash" sem gastar as 3 tentativas de retry no 404 (nao e transiente).
+    withStubServerSequence(
+        (paths) -> {
+          configurarServicoParaTeste("gemini", 0, null);
+          String result = service.parseWithAI("curriculo");
+          assertThat(result).isEqualTo("{\"fullName\":\"Maria\"}");
+          assertThat(paths).hasSize(2);
+          assertThat(paths.get(0)).contains("/models/gemini-flash-latest:generateContent");
+          assertThat(paths.get(1)).contains("/models/gemini-2.5-flash:generateContent");
+        },
+        java.util.List.of(
+            new StubResponse(404, "{\"error\":\"model not found\"}", java.util.Map.of()),
+            new StubResponse(
+                200,
+                "{\"candidates\":[{\"finishReason\":\"STOP\",\"content\":{\"parts\":"
+                    + "[{\"text\":\"{\\\"fullName\\\":\\\"Maria\\\"}\"}]}}]}",
+                java.util.Map.of())));
+  }
+
+  @Test
+  void callGemini_primeiroModeloSobrecarregado_recuperaNoSegundoModelo() throws Exception {
+    // Reproduz o relato do usuario: mesma chave funciona no Google AI Studio mas o app recebe 503
+    // do alias "-latest" — o app deve conseguir completar a importacao trocando de modelo, em vez
+    // de falhar direto.
+    withStubServerSequence(
+        (paths) -> {
+          configurarServicoParaTeste("gemini", 0, null);
+          String result = service.parseWithAI("curriculo");
+          assertThat(result).isEqualTo("{\"fullName\":\"Ana\"}");
+          // esgotou as 3 tentativas do 1o modelo, depois teve sucesso na 1a tentativa do 2o
+          assertThat(paths).hasSize(4);
+          assertThat(paths.get(0)).contains("gemini-flash-latest");
+          assertThat(paths.get(3)).contains("gemini-2.5-flash");
+        },
+        java.util.List.of(
+            new StubResponse(
+                503, "{\"error\":\"UNAVAILABLE\"}", java.util.Map.of("Retry-After", "0")),
+            new StubResponse(
+                503, "{\"error\":\"UNAVAILABLE\"}", java.util.Map.of("Retry-After", "0")),
+            new StubResponse(
+                503, "{\"error\":\"UNAVAILABLE\"}", java.util.Map.of("Retry-After", "0")),
+            new StubResponse(
+                200,
+                "{\"candidates\":[{\"finishReason\":\"STOP\",\"content\":{\"parts\":"
+                    + "[{\"text\":\"{\\\"fullName\\\":\\\"Ana\\\"}\"}]}}]}",
+                java.util.Map.of())));
+  }
+
+  @Test
+  void callGemini_401NoPrimeiroModelo_naoTentaOutrosModelos() throws Exception {
+    // Erro de autenticacao (chave invalida) nao e resolvido trocando de modelo — deve falhar
+    // imediatamente, sem desperdicar tentativas nos outros candidatos.
+    withStubServerSequence(
+        (paths) -> {
+          configurarServicoParaTeste("gemini", 0, null);
+          assertThatThrownBy(() -> service.parseWithAI("curriculo"))
+              .isInstanceOf(AIProviderException.class)
+              .hasMessageContaining("Verifique a API key");
+          assertThat(paths).hasSize(1);
+        },
+        java.util.List.of(
+            new StubResponse(401, "{\"error\":\"invalid api key\"}", java.util.Map.of())));
   }
 
   // ── parseWithAI / callOpenAI e callAnthropic ─────────────────────────────
@@ -422,6 +492,54 @@ class AIImportServiceTest {
     ReflectionTestUtils.setField(service, "provider", provider);
     ReflectionTestUtils.setField(service, "apiKey", "test-key");
     ReflectionTestUtils.setField(service, "model", "");
+  }
+
+  /** Uma resposta HTTP canned (status/corpo/headers) para {@link #withStubServerSequence}. */
+  private record StubResponse(int status, String body, java.util.Map<String, String> headers) {}
+
+  @FunctionalInterface
+  private interface StubServerSequenceTest {
+    void run(java.util.List<String> requestedPaths) throws Exception;
+  }
+
+  /**
+   * Sobe um HttpServer local que responde com uma SEQUENCIA de respostas pre-definidas, uma por
+   * requisicao recebida (a ultima da lista se repete se vierem mais requisicoes que respostas
+   * cadastradas) — usado para simular o fallback de modelo do callGemini: 1o modelo falha (404 ou
+   * 503 esgotado), 2o modelo responde. Tambem captura o path de cada requisicao (contem
+   * /models/{nome-do-modelo}:generateContent), para confirmar qual modelo foi de fato chamado em
+   * cada tentativa.
+   */
+  private void withStubServerSequence(
+      StubServerSequenceTest test, java.util.List<StubResponse> respostas) throws Exception {
+    java.util.List<String> requestedPaths =
+        java.util.Collections.synchronizedList(new java.util.ArrayList<>());
+    java.util.concurrent.atomic.AtomicInteger index =
+        new java.util.concurrent.atomic.AtomicInteger(0);
+    HttpServer httpServer = HttpServer.create(new InetSocketAddress("localhost", 0), 0);
+    httpServer.createContext(
+        "/",
+        exchange -> {
+          requestedPaths.add(exchange.getRequestURI().toString());
+          int i = Math.min(index.getAndIncrement(), respostas.size() - 1);
+          StubResponse resposta = respostas.get(i);
+          resposta.headers().forEach((k, v) -> exchange.getResponseHeaders().add(k, v));
+          byte[] resp = resposta.body().getBytes(StandardCharsets.UTF_8);
+          exchange.sendResponseHeaders(resposta.status(), resp.length);
+          try (var os = exchange.getResponseBody()) {
+            os.write(resp);
+          }
+        });
+    httpServer.start();
+    try {
+      ReflectionTestUtils.setField(
+          service, "httpClient", HttpClient.newBuilder().build(), HttpClient.class);
+      String base = "http://localhost:" + httpServer.getAddress().getPort();
+      ReflectionTestUtils.setField(service, "baseUrl", base);
+      test.run(requestedPaths);
+    } finally {
+      httpServer.stop(0);
+    }
   }
 
   // ── helpers ──────────────────────────────────────────────────────────────
