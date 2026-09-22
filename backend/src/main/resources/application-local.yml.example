@@ -1,5 +1,16 @@
 # Copie para application-local.yml (arquivo NÃO versionado).
-# Preencha os valores abaixo para rodar localmente.
+# Só o valor de cvfacil.ai.api-key precisa ser preenchido para rodar localmente
+# (necessário apenas para testar a importação de currículo por IA). Os demais
+# campos abaixo já funcionam vazios no profile "local":
+#   - spring.datasource: ignorado por padrão (LocalDatabaseConfig sobe um
+#     Postgres embarcado com @Primary; só é usado se cvfacil.local.use-embedded-db=false).
+#   - cvfacil.jwt.private-key/public-key: em branco = JwtService emite tokens
+#     STUB automaticamente (aceitável só no profile "local").
+#   - cvfacil.encryption.master-key: em branco = CryptoConfig usa uma chave
+#     AES zerada automaticamente (aceitável só no profile "local").
+# Preencher qualquer um desses três com um valor placeholder (não-base64/PEM
+# de verdade) FALHA o startup do backend — deixe em branco ou informe uma
+# chave real gerada por você.
 spring:
   datasource:
     url: jdbc:postgresql://localhost:5432/cvfacil
@@ -9,20 +20,14 @@ spring:
     redis:
       url: redis://localhost:6379
 
-# Chaves JWT RS256 geradas localmente (use openssl ou keytool).
-# Em produção elas vêm do KMS/secret manager da Hostinger.
+# Chaves JWT RS256 opcionais no profile "local" (deixe em branco para usar
+# tokens STUB). Se quiser tokens RS256 reais, gere com openssl/keytool.
 cvfacil:
   jwt:
     issuer: http://localhost:8080
-    private-key: |
-      -----BEGIN PRIVATE KEY-----
-      REPLACE_WITH_LOCAL_PRIVATE_KEY
-      -----END PRIVATE KEY-----
-    public-key: |
-      -----BEGIN PUBLIC KEY-----
-      REPLACE_WITH_LOCAL_PUBLIC_KEY
-      -----END PUBLIC KEY-----
+    private-key:
+    public-key:
   ai:
     api-key: sk-REPLACE_WITH_YOUR_KEY
   encryption:
-    master-key: base64:REPLACE_WITH_BASE64_32_BYTES
+    master-key:
