@@ -455,15 +455,30 @@ public class AIImportService {
     return mapper.readTree(response.body()).at("/content/0/text").asText();
   }
 
+  /**
+   * Modelos Gemini tentados em sequencia quando o modelo configurado (ou o padrao) falha de forma
+   * recuperavel. Cobre dois cenarios reais distintos, ambos ja observados em producao com a MESMA
+   * chave de API: (a) "gemini-2.5-flash" fixo retorna 404 para chaves de contas novas (modelo com
+   * acesso restrito) — o alias "gemini-flash-latest" resolve isso; (b) o alias "-latest"/preview e
+   * roteado para um pool de capacidade menor que os modelos GA nomeados e retorna 503 "UNAVAILABLE"
+   * com mais frequencia — reportado pelo usuario como "funciona no Google AI Studio, falha no app"
+   * com a mesma chave, o que so se explica por uma diferenca de modelo/capacidade, ja que o
+   * texto/prompt sao irrelevantes para um erro 503 (esse status e de sobrecarga do servidor, nao de
+   * conteudo). "gemini-2.0-flash" e a ultima linha de defesa: modelo GA estavel, sem "-latest", com
+   * o proprio pool de capacidade dedicado.
+   */
+  private static final String[] GEMINI_FALLBACK_MODELS = {
+    "gemini-flash-latest", "gemini-2.5-flash", "gemini-2.0-flash"
+  };
+
+  /** Tentativas de retry (backoff) dentro de um UNICO modelo, antes de passar para o proximo. */
+  private static final int GEMINI_ATTEMPTS_PER_MODEL = 3;
+
+  private static final long GEMINI_MAX_BACKOFF_MS = 4_000L;
+
   private String callGemini(String text) throws Exception {
-    // "gemini-2.5-flash" fixo retorna 404 para chaves de contas novas (modelo com
-    // acesso restrito); o alias "gemini-flash-latest" resolve para o Flash vigente
-    // e funciona para qualquer chave — usado como fallback mais seguro.
-    String effectiveModel = model.isBlank() ? "gemini-flash-latest" : model;
-    // base-url deve apontar para a raiz da API (ex.:
-    // https://generativelanguage.googleapis.com/v1beta),
-    // sem o segmento /models/{model}:generateContent — este metodo o monta.
-    String url = baseUrl.replaceAll("/+$", "") + "/models/" + effectiveModel + ":generateContent";
+    String configuredModel = model.isBlank() ? GEMINI_FALLBACK_MODELS[0] : model;
+    java.util.List<String> candidates = buildGeminiModelCandidates(configuredModel);
 
     ObjectNode part = mapper.createObjectNode().put("text", text);
     ObjectNode content = mapper.createObjectNode();
@@ -484,66 +499,134 @@ public class AIImportService {
     body.set("contents", contents);
     body.set("systemInstruction", systemInstruction);
     body.set("generationConfig", generationConfig);
+    String requestJson = mapper.writeValueAsString(body);
 
-    HttpRequest request =
-        HttpRequest.newBuilder()
-            .uri(URI.create(url))
-            .header("x-goog-api-key", apiKey)
-            .header("Content-Type", "application/json")
-            .header("Accept", "application/json")
-            .timeout(Duration.ofSeconds(90))
-            .POST(HttpRequest.BodyPublishers.ofString(mapper.writeValueAsString(body)))
-            .build();
+    HttpResponse<String> lastResponse = null;
+    String lastModelTried = configuredModel;
 
-    // Gemini free-tier retorna 503 "UNAVAILABLE" (modelo sobrecarregado) e 429 "RESOURCE_EXHAUSTED"
-    // com frequencia — a propria Google recomenda retry. Sem isso, qualquer pico de demanda no lado
-    // deles derruba a importacao mesmo com chave/modelo corretos.
-    //
-    // 5 tentativas (4 esperas) com backoff exponencial 1s/2s/4s/8s, respeitando o header
-    // Retry-After quando o Gemini o envia (mais confiavel que adivinhar o tempo de espera) — soma
-    // maxima de ~23s, dentro do timeout de 90s da requisicao e do orcamento razoavel de um upload
-    // sincrono. Elevado de 3 tentativas/~3s (insuficiente contra picos reais de sobrecarga,
-    // confirmado em producao) para isto.
-    int maxAttempts = 5;
-    long maxBackoffMs = 8_000L;
-    HttpResponse<String> response = null;
-    for (int attempt = 1; attempt <= maxAttempts; attempt++) {
-      response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
-      int status = response.statusCode();
-      if (status == 200) break;
-      boolean transient_ = status == 503 || status == 429;
-      if (!transient_ || attempt == maxAttempts) {
-        log.error("[AI Import] Gemini retornou HTTP {}: {}", status, response.body());
+    for (int modelIndex = 0; modelIndex < candidates.size(); modelIndex++) {
+      String effectiveModel = candidates.get(modelIndex);
+      lastModelTried = effectiveModel;
+      boolean lastModel = modelIndex == candidates.size() - 1;
+      // base-url deve apontar para a raiz da API (ex.:
+      // https://generativelanguage.googleapis.com/v1beta),
+      // sem o segmento /models/{model}:generateContent — este metodo o monta.
+      String url = baseUrl.replaceAll("/+$", "") + "/models/" + effectiveModel + ":generateContent";
+      HttpRequest request =
+          HttpRequest.newBuilder()
+              .uri(URI.create(url))
+              .header("x-goog-api-key", apiKey)
+              .header("Content-Type", "application/json")
+              .header("Accept", "application/json")
+              .timeout(Duration.ofSeconds(90))
+              .POST(HttpRequest.BodyPublishers.ofString(requestJson))
+              .build();
+
+      for (int attempt = 1; attempt <= GEMINI_ATTEMPTS_PER_MODEL; attempt++) {
+        HttpResponse<String> response =
+            httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+        lastResponse = response;
+        int status = response.statusCode();
+        if (status == 200) return extractGeminiText(response.body());
+
+        boolean modelNotFound = status == 404;
+        boolean transient_ = status == 503 || status == 429;
+        boolean lastAttemptForThisModel = attempt == GEMINI_ATTEMPTS_PER_MODEL;
+
+        if (!modelNotFound && !transient_) {
+          // Erro nao recuperavel (ex.: 401/403 de chave invalida, 400 de payload malformado) —
+          // trocar de modelo nao resolve, e so adiaria um erro que o usuario precisa ver agora.
+          log.error(
+              "[AI Import] Gemini ({}) retornou HTTP {}: {}",
+              effectiveModel,
+              status,
+              response.body());
+          throw new AIProviderException(
+              "Erro na API Gemini (HTTP "
+                  + status
+                  + "). Verifique a API key e o modelo configurado.",
+              502);
+        }
+
+        if (modelNotFound) {
+          log.warn(
+              "[AI Import] Gemini modelo '{}' nao encontrado (HTTP 404) — tentando proximo modelo"
+                  + " candidato.",
+              effectiveModel);
+          break; // passa para o proximo modelo candidato, sem gastar retries neste
+        }
+
+        // transient_ (503/429)
+        if (lastAttemptForThisModel) {
+          log.warn(
+              "[AI Import] Gemini modelo '{}' esgotou {} tentativas (HTTP {}) — tentando proximo"
+                  + " modelo candidato.",
+              effectiveModel,
+              GEMINI_ATTEMPTS_PER_MODEL,
+              status);
+          break; // passa para o proximo modelo candidato
+        }
+
+        long backoffMs =
+            response
+                .headers()
+                .firstValue("Retry-After")
+                .map(AIImportService::parseRetryAfterSeconds)
+                .map(seconds -> Math.min(seconds * 1000L, GEMINI_MAX_BACKOFF_MS))
+                .orElse(Math.min(1000L << (attempt - 1), GEMINI_MAX_BACKOFF_MS));
+        log.warn(
+            "[AI Import] Gemini modelo '{}' retornou HTTP {} (tentativa {}/{}) — retentando em {}ms",
+            effectiveModel,
+            status,
+            attempt,
+            GEMINI_ATTEMPTS_PER_MODEL,
+            backoffMs);
+        try {
+          Thread.sleep(backoffMs);
+        } catch (InterruptedException e) {
+          Thread.currentThread().interrupt();
+          throw new AIProviderException("Importacao interrompida.", 503, e);
+        }
+      }
+
+      if (!lastModel) continue;
+
+      // Todos os modelos candidatos foram esgotados sem sucesso.
+      int finalStatus = lastResponse != null ? lastResponse.statusCode() : -1;
+      log.error(
+          "[AI Import] Gemini esgotou todos os modelos candidatos {}. Ultimo modelo tentado: '{}',"
+              + " ultimo status: {}",
+          candidates,
+          lastModelTried,
+          finalStatus);
+      if (finalStatus == 404) {
         throw new AIProviderException(
-            transient_
-                ? "O modelo Gemini esta temporariamente sobrecarregado. Tente novamente em instantes."
-                : "Erro na API Gemini (HTTP "
-                    + status
-                    + "). Verifique a API key e o modelo configurado.",
-            transient_ ? 503 : 502);
+            "Nenhum dos modelos Gemini configurados foi encontrado para esta chave de API."
+                + " Verifique cvfacil.ai.model.",
+            502);
       }
-      long backoffMs =
-          response
-              .headers()
-              .firstValue("Retry-After")
-              .map(AIImportService::parseRetryAfterSeconds)
-              .map(seconds -> Math.min(seconds * 1000L, maxBackoffMs))
-              .orElse(Math.min(1000L << (attempt - 1), maxBackoffMs));
-      log.warn(
-          "[AI Import] Gemini retornou HTTP {} (tentativa {}/{}) — retentando em {}ms",
-          status,
-          attempt,
-          maxAttempts,
-          backoffMs);
-      try {
-        Thread.sleep(backoffMs);
-      } catch (InterruptedException e) {
-        Thread.currentThread().interrupt();
-        throw new AIProviderException("Importacao interrompida.", 503, e);
-      }
+      throw new AIProviderException(
+          "O modelo Gemini esta temporariamente sobrecarregado. Tente novamente em instantes.",
+          503);
     }
 
-    return extractGeminiText(response.body());
+    // Inalcancavel: o loop acima sempre retorna ou lanca antes de terminar.
+    throw new AIProviderException(
+        "O provedor de IA nao retornou uma resposta valida. Tente novamente.", 502);
+  }
+
+  /**
+   * Monta a lista de modelos Gemini a tentar, na ordem: o modelo configurado primeiro (respeita a
+   * escolha explicita do operador), seguido dos candidatos de {@link #GEMINI_FALLBACK_MODELS} que
+   * ainda nao apareceram na lista (evita tentar o mesmo modelo duas vezes).
+   */
+  private static java.util.List<String> buildGeminiModelCandidates(String configuredModel) {
+    java.util.List<String> candidates = new java.util.ArrayList<>();
+    candidates.add(configuredModel);
+    for (String fallback : GEMINI_FALLBACK_MODELS) {
+      if (!candidates.contains(fallback)) candidates.add(fallback);
+    }
+    return candidates;
   }
 
   /**

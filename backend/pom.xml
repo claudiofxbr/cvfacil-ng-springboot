@@ -34,6 +34,17 @@
              so jackson-databind) para manter databind/annotations/core na mesma versao —
              misturar versoes do family Jackson quebra o ObjectMapper em runtime. -->
         <jackson-bom.version>2.21.4</jackson-bom.version>
+        <!-- CVE-2026-65182 (CRITICAL, bypass de security constraint), CVE-2026-65905
+             (CRITICAL, bypass de autenticacao via replay no DIGEST authenticator) e
+             CVE-2026-68525 (CRITICAL, acesso a recurso nao autorizado via bypass de
+             autenticacao FORM): publicadas apos o 10.1.55 gerenciado pelo BOM do Spring
+             Boot 3.5.16 (herdado acima) — nenhuma exige mudanca de codigo, so a versao
+             corrigida do tomcat-embed-*. O advisory do Trivy cita "10.1.58" como versao
+             corrigida, mas essa versao nunca foi publicada no Maven Central (o
+             tomcat-embed-core pula de 10.1.57 para 10.1.59) — usando 10.1.60, a mais
+             recente da serie 10.1.x, que certamente inclui o fix (10.1.59 e 10.1.60 sao
+             posteriores a 10.1.58). -->
+        <tomcat.version>10.1.60</tomcat.version>
     </properties>
 
     <dependencyManagement>
