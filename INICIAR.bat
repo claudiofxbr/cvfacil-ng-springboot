@@ -92,7 +92,7 @@ if errorlevel 1 (
 )
 
 :: =============================================================================
-:: ETAPA 2 -- Verificar Java (obrigatorio: versao 17+)
+:: ETAPA 2 -- Verificar Java (obrigatorio: versao 21+)
 :: =============================================================================
 where java >nul 2>&1
 if errorlevel 1 (
@@ -124,8 +124,15 @@ if "!JAVA_MAJOR!"=="" (
 echo  [OK] Java encontrado: versao %JAVA_VER% ^(major=!JAVA_MAJOR!^)
 echo [!TS!] OK: Java %JAVA_VER% major=!JAVA_MAJOR! >> "%INICIAR_LOG%"
 
-if !JAVA_MAJOR! LSS 17 (
-    call :ERRO "Java %JAVA_VER% encontrado, mas CVFacil.NG requer Java 17+." ^
+REM ACHADO REAL: o backend e compilado com java.version=21 (backend/pom.xml).
+REM Esta checagem exigia apenas 17+ e deixava passar Java 17, que roda o
+REM script sem erro ate a hora de executar o JAR -- ai falha com
+REM "UnsupportedClassVersionError: class file version 65.0 ... reconhece
+REM ate 61.0" (65=Java 21, 61=Java 17), uma mensagem confusa para quem nao
+REM conhece o numero de class file version do Java. Corrigido para barrar
+REM aqui, com uma mensagem clara, antes de tentar subir o backend.
+if !JAVA_MAJOR! LSS 21 (
+    call :ERRO "Java %JAVA_VER% encontrado, mas CVFacil.NG requer Java 21+." ^
          "Instale o Java 21: https://adoptium.net/temurin/releases/?version=21" ^
          "Apos instalar, reinicie o computador."
     exit /b 1
