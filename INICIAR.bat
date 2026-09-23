@@ -241,9 +241,14 @@ if not exist "%FRONTEND_DIR%\node_modules\" (
     echo  [..] Instalando dependencias do frontend ^(pode demorar na 1a vez^)...
     echo [!TS!] Instalando npm dependencies... >> "%INICIAR_LOG%"
     pushd "%FRONTEND_DIR%"
-    :: CORRECAO BUG #3: %CD% e expandido em tempo de PARSE do bloco if, nao
-    :: apos o pushd executar. Usando !CD! (delayed expansion) para ler o valor
-    :: real do diretorio corrente depois que o pushd foi executado.
+    REM CORRECAO BUG #3: %CD% e expandido em tempo de PARSE do bloco if, nao
+    REM apos o pushd executar. Usando !CD! ^(delayed expansion^) para ler o valor
+    REM real do diretorio corrente depois que o pushd foi executado.
+    REM NOTA: aqui e REM, nao "::" -- "::" dentro de um bloco entre parenteses
+    REM quebra a contagem de parenteses do cmd.exe se o texto do comentario
+    REM contiver "(" ou ")" (era exatamente este o bug: linha continha
+    REM "(delayed expansion)" sem escape, travando com "')' foi inesperado
+    REM neste momento." logo ao entrar nesta etapa).
     if not "!CD!"=="%FRONTEND_DIR%" (
         echo  [ERRO] Nao foi possivel acessar: %FRONTEND_DIR%
         echo         Verifique se o caminho existe e se ha permissao de leitura.
