@@ -294,6 +294,14 @@ echo [!TS!] Iniciando backend >> "%INICIAR_LOG%"
 
 set "JAVA_ARGS=--spring.profiles.active=local --server.port=8080"
 
+:: O Spring Boot valida a registration OAuth2 'google' na inicializacao e falha
+:: o startup com "Client id of registration 'google' must not be empty" se as
+:: variaveis ficarem vazias -- mesmo sem uso real de login Google em dev local.
+:: So define um valor fake se a variavel ainda nao existir (nao sobrescreve
+:: credenciais reais que o usuario ja tenha configurado no ambiente).
+if not defined GOOGLE_OAUTH_CLIENT_ID set "GOOGLE_OAUTH_CLIENT_ID=local-dev-client-id"
+if not defined GOOGLE_OAUTH_CLIENT_SECRET set "GOOGLE_OAUTH_CLIENT_SECRET=local-dev-client-secret"
+
 if "%DEBUG_MODE%"=="1" (
     start "CVFacil -- Backend [DEBUG nao feche]" /D "%BACKEND_DIR%" cmd /k ^
         "java -jar ""%JAR%"" %JAVA_ARGS%"
