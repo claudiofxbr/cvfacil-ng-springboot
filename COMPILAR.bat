@@ -37,8 +37,19 @@ if defined JAVA_HOME if exist "%JAVA_HOME%\bin\java.exe" (
 )
 
 :: Verifica Java
-where "%JAVA_EXE%" >nul 2>&1
+:: NOTA: "where" nao lida bem com um caminho completo entre aspas (foi
+:: projetado para buscar um nome/padrao no PATH, nao para verificar um
+:: caminho literal) -- por isso usamos "if exist" quando JAVA_EXE ja e um
+:: caminho completo (contem ':'), e "where" so no caso do "java" bare.
+set "JAVA_ENCONTRADO=0"
+echo %JAVA_EXE%| findstr /c:":" >nul
 if errorlevel 1 (
+    where "%JAVA_EXE%" >nul 2>&1
+    if not errorlevel 1 set "JAVA_ENCONTRADO=1"
+) else (
+    if exist "%JAVA_EXE%" set "JAVA_ENCONTRADO=1"
+)
+if "%JAVA_ENCONTRADO%"=="0" (
     echo [ERRO] Java nao encontrado ^(nem via JAVA_HOME, nem no PATH^). Instale: https://adoptium.net/temurin/releases/?version=21
     pause & exit /b 1
 )

@@ -109,9 +109,20 @@ if defined JAVA_HOME if exist "%JAVA_HOME%\bin\java.exe" (
     echo [!TS!] OK: JAVA_HOME=%JAVA_HOME% >> "%INICIAR_LOG%"
 )
 
-where "%JAVA_EXE%" >nul 2>&1
+REM NOTA: "where" nao lida bem com um caminho completo entre aspas (foi
+REM projetado para buscar um nome/padrao no PATH, nao para verificar um
+REM caminho literal) -- por isso usamos "if exist" quando JAVA_EXE ja e um
+REM caminho completo (contem ':'), e "where" so no caso do "java" bare.
+set "JAVA_ENCONTRADO=0"
+echo %JAVA_EXE%| findstr /c:":" >nul
 if errorlevel 1 (
-    call :ERRO "Java nao foi encontrado (nem via JAVA_HOME, nem no PATH do sistema)." ^
+    where "%JAVA_EXE%" >nul 2>&1
+    if not errorlevel 1 set "JAVA_ENCONTRADO=1"
+) else (
+    if exist "%JAVA_EXE%" set "JAVA_ENCONTRADO=1"
+)
+if "%JAVA_ENCONTRADO%"=="0" (
+    call :ERRO "Java nao foi encontrado ^(nem via JAVA_HOME, nem no PATH do sistema^)." ^
          "Instale o Java 21: https://adoptium.net/temurin/releases/?version=21" ^
          "Apos instalar, REINICIE o computador e tente novamente."
     exit /b 1
