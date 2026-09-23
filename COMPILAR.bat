@@ -9,7 +9,7 @@
 ::  Pre-requisitos: Java 17+ e Maven 3.9+ instalados no PATH
 ::  Ou: use "scripts\start-cvfacil.bat" que baixa o Maven automaticamente.
 :: ============================================================================
-setlocal
+setlocal enabledelayedexpansion
 title CVFacil.NG — Compilando Backend
 
 set "REPO=%~dp0"
@@ -22,13 +22,44 @@ echo  ^|    CVFacil.NG — Compilando Backend            ^|
 echo  +------------------------------------------------+
 echo.
 
+:: ACHADO REAL: em maquinas com mais de um JDK instalado (ex: Java 17 do
+:: Amazon Corretto registrado no PATH DE SISTEMA + Java 21 do Adoptium so no
+:: PATH DE USUARIO), o Windows resolve o PATH de Sistema ANTES do de Usuario
+:: -- o "java" bare pode nao ser o 21 mesmo com JAVA_HOME/PATH do usuario
+:: corretos. JAVA_HOME, quando definido, e mais confiavel: usamos ele
+:: explicitamente aqui. O "mvn" abaixo ja respeita JAVA_HOME sozinho para
+:: compilar -- esta checagem e so para confirmar a versao ANTES de compilar,
+:: com uma mensagem clara em vez do backend compilar com Java 17 por engano.
+set "JAVA_EXE=java"
+if defined JAVA_HOME if exist "%JAVA_HOME%\bin\java.exe" (
+    set "JAVA_EXE=%JAVA_HOME%\bin\java.exe"
+    echo [OK] JAVA_HOME definido -- usando "%JAVA_HOME%\bin\java.exe" explicitamente.
+)
+
 :: Verifica Java
-where java >nul 2>&1
+where "%JAVA_EXE%" >nul 2>&1
 if errorlevel 1 (
-    echo [ERRO] Java nao encontrado. Instale: https://adoptium.net/temurin/releases/?version=21
+    echo [ERRO] Java nao encontrado ^(nem via JAVA_HOME, nem no PATH^). Instale: https://adoptium.net/temurin/releases/?version=21
     pause & exit /b 1
 )
-for /f "tokens=*" %%L in ('java -version 2^>^&1 ^| findstr /i "version"') do echo [OK] %%L
+for /f "tokens=*" %%L in ('"%JAVA_EXE%" -version 2^>^&1 ^| findstr /i "version"') do echo [OK] %%L
+
+set "JAVA_RAW="
+for /f "tokens=3" %%V in ('"%JAVA_EXE%" -version 2^>^&1 ^| findstr /i "version"') do set "JAVA_RAW=%%V"
+set "JAVA_VER=%JAVA_RAW:"=%"
+set "JAVA_MAJOR="
+for /f "tokens=1 delims=." %%M in ("%JAVA_VER%") do set "JAVA_MAJOR=%%M"
+if "!JAVA_MAJOR!"=="1" (
+    for /f "tokens=2 delims=." %%M in ("%JAVA_VER%") do set "JAVA_MAJOR=%%M"
+)
+if defined JAVA_MAJOR if !JAVA_MAJOR! LSS 21 (
+    echo.
+    echo [ERRO] Java %JAVA_VER% encontrado, mas CVFacil.NG requer Java 21+ ^(backend/pom.xml^).
+    echo        Instale o Java 21: https://adoptium.net/temurin/releases/?version=21
+    echo        Se ja tiver o Java 21 instalado, defina a variavel JAVA_HOME apontando
+    echo        para ele ^(ex: C:\...\jdk-21.0.12.101-hotspot^) e abra um novo terminal.
+    pause & exit /b 1
+)
 
 :: Escolhe Maven: global -> scripts auto-download
 set "MVN="

@@ -93,10 +93,25 @@ if errorlevel 1 (
 
 :: =============================================================================
 :: ETAPA 2 -- Verificar Java (obrigatorio: versao 21+)
+::
+:: ACHADO REAL: em maquinas com mais de um JDK instalado (ex: Java 17 do
+:: Amazon Corretto registrado no PATH DE SISTEMA + Java 21 do Adoptium so no
+:: PATH DE USUARIO), o Windows sempre resolve o PATH de Sistema ANTES do de
+:: Usuario -- reordenar so o PATH de Usuario (ex: REORDENAR_JAVA.ps1) nao
+:: muda qual "java" o cmd encontra primeiro nesse caso. JAVA_HOME, quando
+:: definido, e mais confiavel: usamos ele explicitamente aqui (e no restante
+:: do script) em vez de depender da ordem do PATH.
 :: =============================================================================
-where java >nul 2>&1
+set "JAVA_EXE=java"
+if defined JAVA_HOME if exist "%JAVA_HOME%\bin\java.exe" (
+    set "JAVA_EXE=%JAVA_HOME%\bin\java.exe"
+    echo  [OK] JAVA_HOME definido -- usando "%JAVA_HOME%\bin\java.exe" explicitamente.
+    echo [!TS!] OK: JAVA_HOME=%JAVA_HOME% >> "%INICIAR_LOG%"
+)
+
+where "%JAVA_EXE%" >nul 2>&1
 if errorlevel 1 (
-    call :ERRO "Java nao foi encontrado no PATH do sistema." ^
+    call :ERRO "Java nao foi encontrado (nem via JAVA_HOME, nem no PATH do sistema)." ^
          "Instale o Java 21: https://adoptium.net/temurin/releases/?version=21" ^
          "Apos instalar, REINICIE o computador e tente novamente."
     exit /b 1
@@ -106,7 +121,7 @@ if errorlevel 1 (
 :: CORRECAO BUG #5: se o formato de 'java -version' for incomum, JAVA_MAJOR fica
 :: vazia. 'if %VAR% LSS 17' com variavel vazia gera "operador ausente" e aborta.
 set "JAVA_RAW="
-for /f "tokens=3" %%V in ('java -version 2^>^&1 ^| findstr /i "version"') do set "JAVA_RAW=%%V"
+for /f "tokens=3" %%V in ('"%JAVA_EXE%" -version 2^>^&1 ^| findstr /i "version"') do set "JAVA_RAW=%%V"
 set "JAVA_VER=%JAVA_RAW:"=%"
 set "JAVA_MAJOR="
 for /f "tokens=1 delims=." %%M in ("%JAVA_VER%") do set "JAVA_MAJOR=%%M"
@@ -314,12 +329,15 @@ set "JAVA_ARGS=--spring.profiles.active=local --server.port=8080"
 if not defined GOOGLE_OAUTH_CLIENT_ID set "GOOGLE_OAUTH_CLIENT_ID=local-dev-client-id"
 if not defined GOOGLE_OAUTH_CLIENT_SECRET set "GOOGLE_OAUTH_CLIENT_SECRET=local-dev-client-secret"
 
+REM Usa "%JAVA_EXE%" (resolvido via JAVA_HOME na ETAPA 2, quando disponivel)
+REM em vez do "java" bare -- mesmo motivo do resto do script: nao depender
+REM da ordem do PATH para escolher a versao correta do Java.
 if "%DEBUG_MODE%"=="1" (
     start "CVFacil -- Backend [DEBUG nao feche]" /D "%BACKEND_DIR%" cmd /k ^
-        "java -jar ""%JAR%"" %JAVA_ARGS%"
+        ""%JAVA_EXE%"" -jar ""%JAR%"" %JAVA_ARGS%"
 ) else (
     start "CVFacil -- Backend (nao feche)" /D "%BACKEND_DIR%" cmd /k ^
-        "echo Log: %BACKEND_LOG% & echo. & java -jar ""%JAR%"" %JAVA_ARGS% > ""%BACKEND_LOG%"" 2>&1 & if errorlevel 1 (echo. & echo [ERRO: backend encerrou com falha] & pause) else echo [Backend encerrado normalmente]"
+        "echo Log: %BACKEND_LOG% & echo. & ""%JAVA_EXE%"" -jar ""%JAR%"" %JAVA_ARGS% > ""%BACKEND_LOG%"" 2>&1 & if errorlevel 1 (echo. & echo [ERRO: backend encerrou com falha] & pause) else echo [Backend encerrado normalmente]"
 )
 
 :: =============================================================================
