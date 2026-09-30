@@ -138,7 +138,7 @@
             <groupId>com.googlecode.owasp-java-html-sanitizer</groupId>
             <artifactId>owasp-java-html-sanitizer</artifactId>
             <!-- 20260101.1: corrige CVE-2025-66021 (XSS) -->
-            <version>20260101.1</version>
+            <version>20260924.2</version>
         </dependency>
 
         <!-- HIBP k-anonymity (HTTP client usa HttpClient padrão) -->
