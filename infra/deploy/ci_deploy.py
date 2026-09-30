@@ -175,13 +175,20 @@ def main():
         "traefik.http.routers.cvfacil-web-http.entrypoints=http",
         f"traefik.http.routers.cvfacil-web-http.rule=Host(`{PUBLIC_HOST}`)",
         "traefik.http.routers.cvfacil-web-http.middlewares=redirect-to-https@file",
-        "traefik.http.routers.cvfacil-web-http.priority=1",
+        # Prioridade 1 empatava com o catch-all global da propria EasyPanel
+        # (https-error-page@file, HostRegexp(`.+`), tambem priority=1) -- no
+        # empate o Traefik nao desempatava a nosso favor e a requisicao ia
+        # pro "app not found" da EasyPanel em vez do nosso frontend (502 real
+        # em producao em 30/09, confirmado via API do Traefik). 5 fica acima
+        # do catch-all (1) e abaixo da API (10), sem depender de como a
+        # EasyPanel prioriza suas proprias rotas.
+        "traefik.http.routers.cvfacil-web-http.priority=5",
         "traefik.http.routers.cvfacil-web.entrypoints=https",
         f"traefik.http.routers.cvfacil-web.rule=Host(`{PUBLIC_HOST}`)",
         "traefik.http.routers.cvfacil-web.tls=true",
         "traefik.http.routers.cvfacil-web.tls.certresolver=letsencrypt",
         "traefik.http.routers.cvfacil-web.service=cvfacil-web-svc",
-        "traefik.http.routers.cvfacil-web.priority=1",
+        "traefik.http.routers.cvfacil-web.priority=5",
         "traefik.http.services.cvfacil-web-svc.loadbalancer.server.port=3000",
     ]
 
