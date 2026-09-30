@@ -169,7 +169,7 @@
         <dependency>
             <groupId>net.sourceforge.tess4j</groupId>
             <artifactId>tess4j</artifactId>
-            <version>5.11.0</version>
+            <version>5.20.0</version>
         </dependency>
 
         <!-- Dev local: Postgres embarcado (profile "local"). Binarios por SO em profiles Maven abaixo. -->
