@@ -43,7 +43,7 @@ jobs:
           NEXT_PUBLIC_API_BASE_URL: http://localhost:8080
 
       - name: Upload frontend artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         # Nada baixa este artefato depois (deploy.yml reconstroi do zero via SSH na
         # VPS) — não deixar a cota de armazenamento de artefatos do GitHub Actions
         # (que não recalcula em tempo real após limpeza) bloquear todo o pipeline
@@ -106,7 +106,7 @@ jobs:
         run: mvn -B -DskipTests package
 
       - name: Upload backend artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         # Nada baixa este artefato depois (deploy.yml reconstroi do zero via SSH na
         # VPS) — não deixar a cota de armazenamento de artefatos do GitHub Actions
         # (que não recalcula em tempo real após limpeza) bloquear todo o pipeline
