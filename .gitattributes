@@ -1,0 +1,29 @@
+# Normaliza fim de linha: no repositório, sempre LF. No working tree, o Git
+# converte conforme a plataforma. Elimina o ruído de CRLF em `git status`/`git diff`.
+* text=auto eol=lf
+
+# Scripts que só rodam no Windows mantêm CRLF.
+*.bat  text eol=crlf
+*.ps1  text eol=crlf
+*.cmd  text eol=crlf
+
+# Scripts de shell sempre LF (mesmo editados no Windows).
+*.sh   text eol=lf
+
+# Arquivos binários — nunca aplicar conversão de EOL nem diff textual.
+*.png   binary
+*.jpg   binary
+*.jpeg  binary
+*.gif   binary
+*.ico   binary
+*.pdf   binary
+*.docx  binary
+*.xlsx  binary
+*.jar   binary
+*.war   binary
+*.woff  binary
+*.woff2 binary
+*.ttf   binary
+*.eot   binary
+*.keystore binary
+*.p12   binary
