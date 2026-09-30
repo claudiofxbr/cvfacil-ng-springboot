@@ -52,6 +52,17 @@ jobs:
             "rm -rf /root/cvfacil-build/backend /root/cvfacil-build/frontend && \
              mkdir -p /root/cvfacil-build && cd /root/cvfacil-build && tar -xzf -"
 
+      # ci_deploy.py roda a partir de /root/cvfacil-sb/ na VPS, nao do
+      # checkout do Actions -- sem este passo, uma mudanca no script (versionada
+      # no repo) nunca chega la, e o deploy roda uma copia desatualizada em
+      # silencio (aconteceu de verdade em 30/09, com a migracao pro Traefik).
+      - name: Sync ci_deploy.py para a VPS
+        env:
+          SSH_USER: ${{ secrets.HOSTINGER_SSH_USER }}
+          SSH_HOST: ${{ secrets.HOSTINGER_SSH_HOST }}
+        run: |
+          scp infra/deploy/ci_deploy.py "$SSH_USER@$SSH_HOST:/root/cvfacil-sb/ci_deploy.py"
+
       - name: Build + cutover (backend e frontend)
         env:
           SSH_USER: ${{ secrets.HOSTINGER_SSH_USER }}
@@ -66,7 +77,7 @@ jobs:
           SSH_HOST: ${{ secrets.HOSTINGER_SSH_HOST }}
         run: |
           ssh "$SSH_USER@$SSH_HOST" \
-            "curl -sf -o /dev/null https://cvfacil-ng.xavierbr-vps.tech:8443/login && echo 'site OK'"
+            "curl -sf -o /dev/null https://cvfacil-ng.xavierbr-vps.tech/login && echo 'site OK'"
 
       - name: Notify on failure
         if: failure()
