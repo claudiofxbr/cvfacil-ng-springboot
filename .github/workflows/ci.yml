@@ -146,7 +146,7 @@ jobs:
         # inteiro e bloqueia o deploy. O scan continua rodando e o resultado ("no leaks
         # found" ou a lista de achados) continua no log — revisar manualmente de vez em
         # quando, ja que um crash futuro nao vai mais barrar o deploy sozinho.
-        uses: gitleaks/gitleaks-action@v2
+        uses: gitleaks/gitleaks-action@v3
         continue-on-error: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
