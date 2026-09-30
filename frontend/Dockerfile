@@ -33,4 +33,12 @@ USER cvfacil
 
 EXPOSE 3000
 ENV PORT=3000
+# BUG REAL DE PRODUCAO (30/09): sem isso, o server standalone do Next.js
+# bina so na interface da rede "principal" do container no boot (ex.:
+# 172.16.7.5 da rede cvfacil-sb-net) -- nao em 0.0.0.0, nem em 127.0.0.1.
+# Container multi-rede (cvfacil-sb-net + easypanel, para o Traefik) ficava
+# inalcancavel por QUALQUER outra rede/interface, incluindo o proprio
+# Traefik (502 Bad Gateway). Fix oficial documentado pelo Next.js para
+# deploy standalone em Docker.
+ENV HOSTNAME="0.0.0.0"
 CMD ["node", "server.js"]
