@@ -1,14 +1,14 @@
 # syntax=docker/dockerfile:1
 
 # ---- deps ----
-FROM node:20-alpine AS deps
+FROM node:26-alpine AS deps
 WORKDIR /app
 COPY package.json package-lock.json ./
 # npm ci exige o lock file — build determinístico (nunca npm install).
 RUN npm ci
 
 # ---- build ----
-FROM node:20-alpine AS build
+FROM node:26-alpine AS build
 WORKDIR /app
 ARG NEXT_PUBLIC_API_BASE_URL
 ENV NEXT_PUBLIC_API_BASE_URL=$NEXT_PUBLIC_API_BASE_URL
@@ -19,7 +19,7 @@ COPY . .
 RUN npm run build
 
 # ---- runtime ----
-FROM node:20-alpine AS runtime
+FROM node:26-alpine AS runtime
 WORKDIR /app
 ENV NODE_ENV=production
 RUN addgroup -S cvfacil && adduser -S cvfacil -G cvfacil
