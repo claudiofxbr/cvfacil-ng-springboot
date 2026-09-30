@@ -150,11 +150,16 @@ def main():
         "traefik.enable=true",
         f"traefik.docker.network={TRAEFIK_NETWORK}",
         "traefik.http.routers.cvfacil-api-http.entrypoints=http",
-        f"traefik.http.routers.cvfacil-api-http.rule=Host(`{PUBLIC_HOST}`) && PathPrefix(`/api`,`/oauth2`,`/login/oauth2`)",
+        # Traefik 3.x: PathPrefix() so aceita UM parametro por chamada (nao
+        # uma lista separada por virgula, que era sintaxe de outra versao) --
+        # combina com || para os 3 prefixos da API. Erro real de producao em
+        # 30/09: com a lista, o router nunca registrava (log do Traefik:
+        # "unexpected number of parameters; got 3, expected one of [1]").
+        f"traefik.http.routers.cvfacil-api-http.rule=Host(`{PUBLIC_HOST}`) && (PathPrefix(`/api`) || PathPrefix(`/oauth2`) || PathPrefix(`/login/oauth2`))",
         "traefik.http.routers.cvfacil-api-http.middlewares=redirect-to-https@file",
         "traefik.http.routers.cvfacil-api-http.priority=10",
         "traefik.http.routers.cvfacil-api.entrypoints=https",
-        f"traefik.http.routers.cvfacil-api.rule=Host(`{PUBLIC_HOST}`) && PathPrefix(`/api`,`/oauth2`,`/login/oauth2`)",
+        f"traefik.http.routers.cvfacil-api.rule=Host(`{PUBLIC_HOST}`) && (PathPrefix(`/api`) || PathPrefix(`/oauth2`) || PathPrefix(`/login/oauth2`))",
         "traefik.http.routers.cvfacil-api.tls=true",
         "traefik.http.routers.cvfacil-api.tls.certresolver=letsencrypt",
         "traefik.http.routers.cvfacil-api.service=cvfacil-api-svc",
