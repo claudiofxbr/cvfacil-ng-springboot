@@ -12,7 +12,7 @@ COPY src ./src
 RUN mvn -B -P '!embedded-pg-linux' -DskipTests package
 
 # ---- runtime ----
-FROM eclipse-temurin:21-jre-jammy AS runtime
+FROM eclipse-temurin:25-jre-jammy AS runtime
 WORKDIR /app
 RUN useradd --system --uid 1001 --create-home cvfacil
 COPY --from=build /app/target/cvfacil-backend-*.jar app.jar
