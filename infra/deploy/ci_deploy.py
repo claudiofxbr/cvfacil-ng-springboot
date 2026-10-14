@@ -13,6 +13,7 @@ Traefik (nao mais "-p 8443:..."); a URL publica perdeu a porta customizada.
 Uso: python3 ci_deploy.py <git-sha-curto>
 """
 import json
+import os
 import subprocess
 import sys
 import time
@@ -22,6 +23,10 @@ import urllib.request
 # migracao para EasyPanel).
 PUBLIC_HOST = "cvfacil-ng.xavierbr-vps.tech"
 TRAEFIK_NETWORK = "easypanel"
+
+# Env do backend na VPS (fora do repo). So e lido quando o container nao existe
+# para herdar env — sem ele o backend sobe sem banco/JWT e nunca fica saudavel.
+BACKEND_ENV_FILE = "/root/cvfacil-sb/backend.env"
 
 # Corrige, a cada deploy, env vars publicas que ainda apontavam para o Caddy
 # antigo (":8443") — assim a correcao se propaga sozinha daqui pra frente,
@@ -45,6 +50,13 @@ def fix_stale_8443_env(env_list):
         else:
             fixed.append(entry)
     return fixed
+
+
+def load_env_file(path):
+    """Le KEY=VALUE do arquivo (ignora vazias e comentarios). Nunca imprime valores."""
+    with open(path, encoding="utf-8") as fh:
+        return [line.strip() for line in fh
+                if line.strip() and not line.lstrip().startswith("#") and "=" in line]
 
 
 def run(cmd, **kw):
@@ -71,7 +83,8 @@ def wait_healthy(url, attempts=10, delay=3):
 
 
 def deploy_service(name, image_tag, dockerfile_dir, container_name, port_map,
-                    health_url, extra_build_args=None, traefik_labels=None):
+                    health_url, extra_build_args=None, traefik_labels=None,
+                    env_file=None):
     build_cmd = ["docker", "build", "-t", image_tag]
     for arg in (extra_build_args or []):
         build_cmd += ["--build-arg", arg]
@@ -91,9 +104,16 @@ def deploy_service(name, image_tag, dockerfile_dir, container_name, port_map,
         run_ok(["docker", "rename", container_name, old_name])
     else:
         # Container nao existe (ex.: sumiu manualmente, como o frontend em
-        # 30/09) — sobe do zero, sem env herdado, em vez de travar o deploy.
+        # 30/09) — sobe do zero em vez de travar o deploy. Se houver arquivo de
+        # env da VPS, usa ele; sem isso o backend sobe sem DATABASE_URL/JWT.
         print(f"aviso: {container_name} nao existe ainda, subindo pela primeira vez")
-        env = []
+        if env_file and os.path.isfile(env_file):
+            env = fix_stale_8443_env(load_env_file(env_file))
+            print(f"env carregado de {env_file} ({len(env)} variaveis)")
+        else:
+            env = []
+            if env_file:
+                print(f"aviso: {env_file} nao encontrado — subindo sem env")
 
     cmd = ["docker", "run", "-d", "--name", container_name,
            "--network", "cvfacil-sb-net", "-p", port_map, "--restart", "unless-stopped"]
@@ -202,6 +222,7 @@ def main():
         "127.0.0.1:8095:8080",
         health_url="http://localhost:8095/actuator/health",
         traefik_labels=backend_labels,
+        env_file=BACKEND_ENV_FILE,
     )
 
     deploy_service(
