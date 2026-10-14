@@ -76,8 +76,18 @@ jobs:
           SSH_USER: ${{ secrets.HOSTINGER_SSH_USER }}
           SSH_HOST: ${{ secrets.HOSTINGER_SSH_HOST }}
         run: |
-          ssh "$SSH_USER@$SSH_HOST" \
-            "curl -sf -o /dev/null https://cvfacil-ng.xavierbr-vps.tech/login && echo 'site OK'"
+          # O Traefik demora alguns segundos para registrar os containers novos
+          # (uma unica tentativa falhou em 30/09 com os dois builds OK). Exige
+          # 200 exato, sem seguir redirect: um 301 para outro host passaria
+          # pelo "curl -f" mesmo com o nosso app fora do ar.
+          ssh "$SSH_USER@$SSH_HOST" '
+            for i in $(seq 1 12); do
+              code=$(curl -s -o /dev/null -w "%{http_code}" https://cvfacil-ng.xavierbr-vps.tech/login || true)
+              if [ "$code" = "200" ]; then echo "site OK"; exit 0; fi
+              echo "tentativa $i/12: HTTP $code"
+              sleep 5
+            done
+            exit 1'
 
       - name: Notify on failure
         if: failure()
