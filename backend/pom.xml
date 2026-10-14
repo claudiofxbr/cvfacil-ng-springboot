@@ -33,7 +33,11 @@
              foi corrigida, so 2.18.8+, 2.21.4+ e 3.1.4+. Sobe todo o jackson-bom junto (nao
              so jackson-databind) para manter databind/annotations/core na mesma versao —
              misturar versoes do family Jackson quebra o ObjectMapper em runtime. -->
-        <jackson-bom.version>2.21.4</jackson-bom.version>
+        <jackson-bom.version>2.21.7</jackson-bom.version>
+        <!-- CVE-2026-75595 (CRITICAL, SNI routing bypass em netty-handler): o BOM do Boot
+             3.5.16 gerencia 4.1.135.Final; corrigido em 4.1.137.Final. Sobe a serie 4.1.x
+             na versao mais recente para manter os modulos netty alinhados. -->
+        <netty.version>4.1.139.Final</netty.version>
         <!-- CVE-2026-65182 (CRITICAL, bypass de security constraint), CVE-2026-65905
              (CRITICAL, bypass de autenticacao via replay no DIGEST authenticator) e
              CVE-2026-68525 (CRITICAL, acesso a recurso nao autorizado via bypass de
