@@ -36,9 +36,12 @@ import org.springframework.scheduling.annotation.Scheduled;
  * <p>- Ao encerrar (@PreDestroy): exporta todos os usuários para
  * <repo-root>/.runtime/pg-users-backup.sql (INSERTs idempotentes).
  *
- * <p>- A cada 60 s (@Scheduled): faz backup incremental enquanto a app roda, garantindo que
+ * <p>- A cada 10 s (@Scheduled): faz backup incremental enquanto a app roda, garantindo que
  * usuários criados entre reinicias não sejam perdidos mesmo em caso de kill abrupto (SIGKILL,
- * fechamento forçado da janela).
+ * fechamento forçado da janela). Intervalo elevado de 60s para 10s (achado real: um cadastro
+ * seguido de reinício rápido do backend em dev — cenário comum ao trocar configuração e reiniciar
+ * logo em seguida — perdia o usuário porque o kill forçado (taskkill /F) não chama @PreDestroy e o
+ * backup periódico ainda não tinha rodado dentro da janela de 30-90s anterior.
  *
  * <p>- Ao iniciar (ApplicationReadyEvent, após Flyway migrar o schema): se o arquivo de backup
  * existir, executa os INSERTs para restaurar os dados.
@@ -90,7 +93,7 @@ public class LocalDataPersistenceConfig {
   // @PreDestroy NÃO é chamado em SIGKILL — este agendamento garante que
   // usuários recém-criados não sejam perdidos na próxima reinicialização.
 
-  @Scheduled(fixedDelay = 60_000, initialDelay = 30_000)
+  @Scheduled(fixedDelay = 10_000, initialDelay = 5_000)
   public void periodicBackup() {
     doBackup(false);
   }
