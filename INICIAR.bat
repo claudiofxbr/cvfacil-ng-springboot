@@ -92,11 +92,37 @@ if errorlevel 1 (
 )
 
 :: =============================================================================
-:: ETAPA 2 -- Verificar Java (obrigatorio: versao 17+)
+:: ETAPA 2 -- Verificar Java (obrigatorio: versao 21+)
+::
+:: ACHADO REAL: em maquinas com mais de um JDK instalado (ex: Java 17 do
+:: Amazon Corretto registrado no PATH DE SISTEMA + Java 21 do Adoptium so no
+:: PATH DE USUARIO), o Windows sempre resolve o PATH de Sistema ANTES do de
+:: Usuario -- reordenar so o PATH de Usuario (ex: REORDENAR_JAVA.ps1) nao
+:: muda qual "java" o cmd encontra primeiro nesse caso. JAVA_HOME, quando
+:: definido, e mais confiavel: usamos ele explicitamente aqui (e no restante
+:: do script) em vez de depender da ordem do PATH.
 :: =============================================================================
-where java >nul 2>&1
+set "JAVA_EXE=java"
+if defined JAVA_HOME if exist "%JAVA_HOME%\bin\java.exe" (
+    set "JAVA_EXE=%JAVA_HOME%\bin\java.exe"
+    echo  [OK] JAVA_HOME definido -- usando "%JAVA_HOME%\bin\java.exe" explicitamente.
+    echo [!TS!] OK: JAVA_HOME=%JAVA_HOME% >> "%INICIAR_LOG%"
+)
+
+REM NOTA: "where" nao lida bem com um caminho completo entre aspas (foi
+REM projetado para buscar um nome/padrao no PATH, nao para verificar um
+REM caminho literal) -- por isso usamos "if exist" quando JAVA_EXE ja e um
+REM caminho completo (contem ':'), e "where" so no caso do "java" bare.
+set "JAVA_ENCONTRADO=0"
+echo %JAVA_EXE%| findstr /c:":" >nul
 if errorlevel 1 (
-    call :ERRO "Java nao foi encontrado no PATH do sistema." ^
+    where "%JAVA_EXE%" >nul 2>&1
+    if not errorlevel 1 set "JAVA_ENCONTRADO=1"
+) else (
+    if exist "%JAVA_EXE%" set "JAVA_ENCONTRADO=1"
+)
+if "%JAVA_ENCONTRADO%"=="0" (
+    call :ERRO "Java nao foi encontrado ^(nem via JAVA_HOME, nem no PATH do sistema^)." ^
          "Instale o Java 21: https://adoptium.net/temurin/releases/?version=21" ^
          "Apos instalar, REINICIE o computador e tente novamente."
     exit /b 1
@@ -106,7 +132,7 @@ if errorlevel 1 (
 :: CORRECAO BUG #5: se o formato de 'java -version' for incomum, JAVA_MAJOR fica
 :: vazia. 'if %VAR% LSS 17' com variavel vazia gera "operador ausente" e aborta.
 set "JAVA_RAW="
-for /f "tokens=3" %%V in ('java -version 2^>^&1 ^| findstr /i "version"') do set "JAVA_RAW=%%V"
+for /f "tokens=3" %%V in ('"%JAVA_EXE%" -version 2^>^&1 ^| findstr /i "version"') do set "JAVA_RAW=%%V"
 set "JAVA_VER=%JAVA_RAW:"=%"
 set "JAVA_MAJOR="
 for /f "tokens=1 delims=." %%M in ("%JAVA_VER%") do set "JAVA_MAJOR=%%M"
@@ -124,8 +150,15 @@ if "!JAVA_MAJOR!"=="" (
 echo  [OK] Java encontrado: versao %JAVA_VER% ^(major=!JAVA_MAJOR!^)
 echo [!TS!] OK: Java %JAVA_VER% major=!JAVA_MAJOR! >> "%INICIAR_LOG%"
 
-if !JAVA_MAJOR! LSS 17 (
-    call :ERRO "Java %JAVA_VER% encontrado, mas CVFacil.NG requer Java 17+." ^
+REM ACHADO REAL: o backend e compilado com java.version=21 (backend/pom.xml).
+REM Esta checagem exigia apenas 17+ e deixava passar Java 17, que roda o
+REM script sem erro ate a hora de executar o JAR -- ai falha com
+REM "UnsupportedClassVersionError: class file version 65.0 ... reconhece
+REM ate 61.0" (65=Java 21, 61=Java 17), uma mensagem confusa para quem nao
+REM conhece o numero de class file version do Java. Corrigido para barrar
+REM aqui, com uma mensagem clara, antes de tentar subir o backend.
+if !JAVA_MAJOR! LSS 21 (
+    call :ERRO "Java %JAVA_VER% encontrado, mas CVFacil.NG requer Java 21+." ^
          "Instale o Java 21: https://adoptium.net/temurin/releases/?version=21" ^
          "Apos instalar, reinicie o computador."
     exit /b 1
@@ -241,9 +274,14 @@ if not exist "%FRONTEND_DIR%\node_modules\" (
     echo  [..] Instalando dependencias do frontend ^(pode demorar na 1a vez^)...
     echo [!TS!] Instalando npm dependencies... >> "%INICIAR_LOG%"
     pushd "%FRONTEND_DIR%"
-    :: CORRECAO BUG #3: %CD% e expandido em tempo de PARSE do bloco if, nao
-    :: apos o pushd executar. Usando !CD! (delayed expansion) para ler o valor
-    :: real do diretorio corrente depois que o pushd foi executado.
+    REM CORRECAO BUG #3: %CD% e expandido em tempo de PARSE do bloco if, nao
+    REM apos o pushd executar. Usando !CD! ^(delayed expansion^) para ler o valor
+    REM real do diretorio corrente depois que o pushd foi executado.
+    REM NOTA: aqui e REM, nao "::" -- "::" dentro de um bloco entre parenteses
+    REM quebra a contagem de parenteses do cmd.exe se o texto do comentario
+    REM contiver "(" ou ")" (era exatamente este o bug: linha continha
+    REM "(delayed expansion)" sem escape, travando com "')' foi inesperado
+    REM neste momento." logo ao entrar nesta etapa).
     if not "!CD!"=="%FRONTEND_DIR%" (
         echo  [ERRO] Nao foi possivel acessar: %FRONTEND_DIR%
         echo         Verifique se o caminho existe e se ha permissao de leitura.
@@ -294,12 +332,23 @@ echo [!TS!] Iniciando backend >> "%INICIAR_LOG%"
 
 set "JAVA_ARGS=--spring.profiles.active=local --server.port=8080"
 
+:: O Spring Boot valida a registration OAuth2 'google' na inicializacao e falha
+:: o startup com "Client id of registration 'google' must not be empty" se as
+:: variaveis ficarem vazias -- mesmo sem uso real de login Google em dev local.
+:: So define um valor fake se a variavel ainda nao existir (nao sobrescreve
+:: credenciais reais que o usuario ja tenha configurado no ambiente).
+if not defined GOOGLE_OAUTH_CLIENT_ID set "GOOGLE_OAUTH_CLIENT_ID=local-dev-client-id"
+if not defined GOOGLE_OAUTH_CLIENT_SECRET set "GOOGLE_OAUTH_CLIENT_SECRET=local-dev-client-secret"
+
+REM Usa "%JAVA_EXE%" (resolvido via JAVA_HOME na ETAPA 2, quando disponivel)
+REM em vez do "java" bare -- mesmo motivo do resto do script: nao depender
+REM da ordem do PATH para escolher a versao correta do Java.
 if "%DEBUG_MODE%"=="1" (
     start "CVFacil -- Backend [DEBUG nao feche]" /D "%BACKEND_DIR%" cmd /k ^
-        "java -jar ""%JAR%"" %JAVA_ARGS%"
+        ""%JAVA_EXE%"" -jar ""%JAR%"" %JAVA_ARGS%"
 ) else (
     start "CVFacil -- Backend (nao feche)" /D "%BACKEND_DIR%" cmd /k ^
-        "echo Log: %BACKEND_LOG% & echo. & java -jar ""%JAR%"" %JAVA_ARGS% > ""%BACKEND_LOG%"" 2>&1 & if errorlevel 1 (echo. & echo [ERRO: backend encerrou com falha] & pause) else echo [Backend encerrado normalmente]"
+        "echo Log: %BACKEND_LOG% & echo. & ""%JAVA_EXE%"" -jar ""%JAR%"" %JAVA_ARGS% > ""%BACKEND_LOG%"" 2>&1 & if errorlevel 1 (echo. & echo [ERRO: backend encerrou com falha] & pause) else echo [Backend encerrado normalmente]"
 )
 
 :: =============================================================================
